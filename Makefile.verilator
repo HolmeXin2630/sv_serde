@@ -1,0 +1,25 @@
+VERILATOR ?= verilator
+VERILATOR_FLAGS = --cc --exe --build -Wall -Wno-DECLFILENAME
+
+SV_SRC = sv_json/src/sv_json_pkg.sv
+DPI_SRC = sv_json/src/dpi/sv_json_dpi.cc
+TEST_SV = sv_json/tests/sv_json_test.sv
+TEST_CPP = sv_json/tests/main_json.cpp
+TOP = sv_json_test
+OBJ_DIR = obj_dir_json
+
+.PHONY: run_test_json clean
+
+run_test_json:
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		$(SV_SRC) \
+		$(TEST_SV) \
+		$(TEST_CPP) \
+		$(DPI_SRC) \
+		--top-module $(TOP) \
+		--Mdir $(OBJ_DIR) \
+		-o test_json
+	./$(OBJ_DIR)/test_json
+
+clean:
+	rm -rf obj_dir_*

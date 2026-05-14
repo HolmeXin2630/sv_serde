@@ -1,0 +1,40 @@
+{
+  "project": {
+    "name": "sv_serde",
+    "version": "1.0.0",
+    "authors": ["alice", "bob", "charlie"],
+    "config": {
+      "debug": false,
+      "timeout_ms": 5000,
+      "retries": 3,
+      "tags": ["json", "yaml", "sv"],
+      "endpoints": [
+        {"host": "10.0.0.1", "port": 8080, "tls": true},
+        {"host": "10.0.0.2", "port": 8081, "tls": false}
+      ]
+    },
+    "features": {
+      "parsing": {"enabled": true, "engine": "nlohmann"},
+      "serialization": {"indent": 2, "ensure_ascii": false}
+    }
+  },
+  "test_data": {
+    "null_value": null,
+    "bool_true": true,
+    "bool_false": false,
+    "int_zero": 0,
+    "int_negative": -42,
+    "int_large": 9999999999,
+    "float_pi": 3.14159265358979,
+    "float_small": 0.001,
+    "string_empty": "",
+    "string_unicode": "hello 世界",
+    "array_empty": [],
+    "object_empty": {},
+    "deep_nested": {
+      "l1": {"l2": {"l3": {"l4": {"l5": {"value": "deep"}}}}}
+    }
+  },
+  "matrix": [[1, 2, 3], [4, 5, 6], [7, 8, 9]],
+  "mixed_array": [1, "two", true, null, 3.14, {"key": "val"}, [10, 20]]
+}
