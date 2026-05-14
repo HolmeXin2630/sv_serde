@@ -69,7 +69,7 @@ Copy the following into your project:
 your_project/
 ├── sv_serde/
 │   └── src/
-│       └── sv_serde.sv            # Unified package (imports both)
+│       └── sv_serde_pkg.sv            # Unified package (imports both)
 ├── sv_json/
 │   ├── src/
 │   │   ├── sv_json_pkg.sv        # Package + class

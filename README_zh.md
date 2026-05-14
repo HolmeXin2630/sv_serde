@@ -69,7 +69,7 @@ string flow = y.yaml_dump_flow();
 your_project/
 ├── sv_serde/
 │   └── src/
-│       └── sv_serde.sv            # 统一包（同时导入两个）
+│       └── sv_serde_pkg.sv            # 统一包（同时导入两个）
 ├── sv_json/
 │   ├── src/
 │   │   ├── sv_json_pkg.sv        # 包 + 类定义

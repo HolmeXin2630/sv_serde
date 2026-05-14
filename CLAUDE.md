@@ -13,7 +13,7 @@ make -f run/Makefile.verilator run_test_all    # Both (221 tests)
 ## Structure
 
 ### sv_serde (unified)
-- `sv_serde/src/sv_serde.sv` — Unified package importing both sv_json_pkg and sv_yaml_pkg
+- `sv_serde/src/sv_serde_pkg.sv` — Unified package importing both sv_json_pkg and sv_yaml_pkg
 
 ### sv_json
 - `sv_json/src/sv_json_pkg.sv` — SV package with types, DPI imports, sv_json class
