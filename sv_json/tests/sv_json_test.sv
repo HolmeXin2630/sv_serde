@@ -6,6 +6,7 @@ module sv_json_test;
   import "DPI-C" function int    dpi_json_new_object();
   import "DPI-C" function int    dpi_json_new_array();
   import "DPI-C" function int    dpi_json_parse(input string input_str);
+  import "DPI-C" function void   dpi_json_destroy(input int h);
 
   // DPI imports — type checking
   import "DPI-C" function int    dpi_json_is_null(input int h);
@@ -27,8 +28,23 @@ module sv_json_test;
   import "DPI-C" function int    dpi_json_empty(input int h);
   import "DPI-C" function int    dpi_json_size(input int h);
 
+  // DPI imports — structure access (extended)
+  import "DPI-C" function int    dpi_json_is_real(input int h);
+  import "DPI-C" function int    dpi_json_at_path(input int h, input string path);
+  import "DPI-C" function int    dpi_json_contains(input int h, input string key);
+  import "DPI-C" function string dpi_json_key_at(input int h, input int idx);
+
+  // DPI imports — modification
+  import "DPI-C" function int    dpi_json_set(input int h, input string key, input int val_h);
+  import "DPI-C" function int    dpi_json_push(input int h, input int val_h);
+  import "DPI-C" function int    dpi_json_insert_at(input int h, input int idx, input int val_h);
+  import "DPI-C" function int    dpi_json_remove(input int h, input string key);
+  import "DPI-C" function int    dpi_json_remove_at(input int h, input int idx);
+  import "DPI-C" function int    dpi_json_update(input int h, input int other_h);
+
   // DPI imports — serialization
   import "DPI-C" function string dpi_json_dump(input int h, input int indent);
+  import "DPI-C" function int    dpi_json_dump_file(input int h, input string fname, input int indent);
 
   task automatic check(string test_name, string actual, string expected);
     if (actual == expected) begin
@@ -154,6 +170,115 @@ module sv_json_test;
     check_int("value_int missing", (y_h != 0) ? dpi_json_as_int(y_h) : 99, 99);
     z_h = dpi_json_get(h, "z");
     check("value_string missing", (z_h != 0) ? dpi_json_as_string(z_h) : "def", "def");
+
+    // --- Structure access: contains ---
+    j = dpi_json_parse("{\"a\":1,\"b\":2}");
+    check_bit("contains existing", dpi_json_contains(j, "a"), 1);
+    check_bit("contains missing", dpi_json_contains(j, "nope"), 0);
+
+    // --- Structure access: key_at ---
+    check("key_at(0)", dpi_json_key_at(j, 0), "a");
+
+    // --- Structure access: at_path ---
+    begin
+      int nested, path_result, arr, arr_path, missing_path;
+      nested = dpi_json_parse("{\"a\":{\"b\":{\"c\":42}}}");
+      path_result = dpi_json_at_path(nested, "/a/b/c");
+      check_int("at_path nested", dpi_json_as_int(path_result), 42);
+
+      arr = dpi_json_parse("[[1,2],[3,4]]");
+      arr_path = dpi_json_at_path(arr, "/1/0");
+      check_int("at_path array", dpi_json_as_int(arr_path), 3);
+
+      missing_path = dpi_json_at_path(j, "/nonexistent");
+      check_bit("at_path missing null", (missing_path == 0) ? 1 : 0, 1);
+    end
+
+    // --- Modification: set ---
+    begin
+      int orig, modified, b_val;
+      orig = dpi_json_parse("{\"a\":1}");
+      modified = dpi_json_set(orig, "b", dpi_json_parse("2"));
+      check_int("set: original unchanged", dpi_json_size(orig), 1);
+      b_val = dpi_json_get(modified, "b");
+      check_int("set: new has b", dpi_json_as_int(b_val), 2);
+    end
+
+    // --- Modification: push ---
+    begin
+      int arr3, arr4, el2;
+      arr3 = dpi_json_parse("[1,2]");
+      arr4 = dpi_json_push(arr3, dpi_json_parse("3"));
+      check_int("push: original size", dpi_json_size(arr3), 2);
+      check_int("push: new size", dpi_json_size(arr4), 3);
+      el2 = dpi_json_at(arr4, 2);
+      check_int("push: new[2]", dpi_json_as_int(el2), 3);
+    end
+
+    // --- Modification: insert_at ---
+    begin
+      int arr5, arr6, ia_el0, ia_el1;
+      arr5 = dpi_json_parse("[1,2]");
+      arr6 = dpi_json_insert_at(arr5, 0, dpi_json_parse("99"));
+      ia_el0 = dpi_json_at(arr6, 0);
+      check_int("insert_at: new[0]", dpi_json_as_int(ia_el0), 99);
+      ia_el1 = dpi_json_at(arr6, 1);
+      check_int("insert_at: new[1]", dpi_json_as_int(ia_el1), 1);
+    end
+
+    // --- Modification: remove ---
+    begin
+      int obj_rem, obj_rem2, b_val;
+      obj_rem = dpi_json_parse("{\"a\":1,\"b\":2}");
+      obj_rem2 = dpi_json_remove(obj_rem, "a");
+      check_bit("remove: original has a", dpi_json_contains(obj_rem, "a"), 1);
+      check_bit("remove: new missing a", dpi_json_contains(obj_rem2, "a"), 0);
+      b_val = dpi_json_get(obj_rem2, "b");
+      check_int("remove: new has b", dpi_json_as_int(b_val), 2);
+    end
+
+    // --- Modification: remove_at ---
+    begin
+      int arr7, arr8, ra_el0, ra_el1;
+      arr7 = dpi_json_parse("[10,20,30]");
+      arr8 = dpi_json_remove_at(arr7, 1);
+      check_int("remove_at: new size", dpi_json_size(arr8), 2);
+      ra_el0 = dpi_json_at(arr8, 0);
+      check_int("remove_at: new[0]", dpi_json_as_int(ra_el0), 10);
+      ra_el1 = dpi_json_at(arr8, 1);
+      check_int("remove_at: new[1]", dpi_json_as_int(ra_el1), 30);
+    end
+
+    // --- Modification: update ---
+    begin
+      int u1, u2, u3, a_val, b_val;
+      u1 = dpi_json_parse("{\"a\":1}");
+      u2 = dpi_json_parse("{\"b\":2,\"a\":99}");
+      u3 = dpi_json_update(u1, u2);
+      a_val = dpi_json_get(u3, "a");
+      check_int("update: overridden a", dpi_json_as_int(a_val), 99);
+      b_val = dpi_json_get(u3, "b");
+      check_int("update: new b", dpi_json_as_int(b_val), 2);
+    end
+
+    // --- JSON Pointer edge cases (RFC 6901: ~0 = ~, ~1 = /) ---
+    begin
+      int ptr, tilde, slash, nested_slash;
+      ptr = dpi_json_parse("{\"~0\":\"tilde\",\"~1\":\"slash\",\"a/b\":{\"c\":1}}");
+      tilde = dpi_json_at_path(ptr, "/~00");
+      check("pointer: ~0 tilde", dpi_json_as_string(tilde), "tilde");
+      slash = dpi_json_at_path(ptr, "/~01");
+      check("pointer: ~1 slash", dpi_json_as_string(slash), "slash");
+      nested_slash = dpi_json_at_path(ptr, "/a~1b/c");
+      check_int("pointer: nested slash key", dpi_json_as_int(nested_slash), 1);
+    end
+
+    // --- Destroy ---
+    begin
+      int tmp = dpi_json_parse("{\"tmp\":1}");
+      dpi_json_destroy(tmp);
+      check_bit("destroy: no crash", 1, 1);
+    end
 
     $display("\nBasic tests: %0d passed, %0d failed", pass_count, fail_count);
     if (fail_count > 0) $finish(1);
