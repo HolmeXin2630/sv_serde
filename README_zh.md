@@ -95,7 +95,7 @@ your_project/
 ```systemverilog
 import sv_json_pkg::*;   // 仅 JSON
 import sv_yaml_pkg::*;   // 仅 YAML
-import sv_serde::*;       // 同时包含 JSON 和 YAML
+import sv_serde_pkg::*;       // 同时包含 JSON 和 YAML
 ```
 
 ### VCS

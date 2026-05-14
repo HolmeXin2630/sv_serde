@@ -31,7 +31,7 @@ make -f run/Makefile.verilator run_test_all    # Both (221 tests)
 
 ```systemverilog
 // Unified import (both JSON and YAML)
-import sv_serde::*;
+import sv_serde_pkg::*;
 
 // Or import individually
 import sv_json_pkg::*;
