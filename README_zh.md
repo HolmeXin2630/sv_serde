@@ -101,19 +101,14 @@ import sv_serde_pkg::*;       // 同时包含 JSON 和 YAML
 ### VCS
 
 ```bash
-vcs -full64 -sverilog -dpiheader sv_json/src/dpi/sv_json_dpi.h \
+# 仅 JSON
+vcs -full64 -sverilog \
     sv_json/src/sv_json_pkg.sv your_test.sv \
     sv_json/src/dpi/sv_json_dpi.cc \
     -o simv
-./simv
-```
 
-带 YAML 支持：
-
-```bash
+# JSON + YAML
 vcs -full64 -sverilog \
-    -dpiheader sv_json/src/dpi/sv_json_dpi.h \
-    -dpiheader sv_yaml/src/dpi/sv_yaml_dpi.h \
     sv_json/src/sv_json_pkg.sv \
     sv_yaml/src/sv_yaml_pkg.sv \
     your_test.sv \
@@ -125,7 +120,7 @@ vcs -full64 -sverilog \
 ### Xcelium
 
 ```bash
-xrun -sv -dpiheader sv_json/src/dpi/sv_json_dpi.h \
+xrun -sv \
      sv_json/src/sv_json_pkg.sv your_test.sv \
      sv_json/src/dpi/sv_json_dpi.cc
 ```
