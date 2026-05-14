@@ -1,0 +1,8 @@
+literal: |
+  Hello World
+  How are you?
+folded: >
+  This is
+  folded text
+strip: |-
+  No trailing newline

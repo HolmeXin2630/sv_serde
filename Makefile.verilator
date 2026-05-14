@@ -7,7 +7,14 @@ TEST_CPP = sv_json/tests/main_json.cpp
 TOP = sv_json_test
 OBJ_DIR = obj_dir_json
 
-.PHONY: run_test_json clean
+YAML_SV_SRC = sv_yaml/src/sv_yaml_pkg.sv
+YAML_DPI_SRC = sv_yaml/src/dpi/sv_yaml_dpi.cc
+YAML_TEST_SV = sv_yaml/tests/sv_yaml_test.sv
+YAML_TEST_CPP = sv_yaml/tests/main_yaml.cpp
+YAML_TOP = sv_yaml_test
+YAML_OBJ_DIR = obj_dir_yaml
+
+.PHONY: run_test_json run_test_yaml run_test_all clean
 
 run_test_json:
 	$(VERILATOR) $(VERILATOR_FLAGS) \
@@ -18,6 +25,19 @@ run_test_json:
 		--Mdir $(OBJ_DIR) \
 		-o test_json
 	./$(OBJ_DIR)/test_json
+
+run_test_yaml:
+	$(VERILATOR) $(VERILATOR_FLAGS) \
+		$(YAML_TEST_SV) \
+		$(YAML_TEST_CPP) \
+		$(YAML_DPI_SRC) \
+		--top-module $(YAML_TOP) \
+		--Mdir $(YAML_OBJ_DIR) \
+		-o test_yaml
+	./$(YAML_OBJ_DIR)/test_yaml
+
+run_test_all: run_test_json run_test_yaml
+	@echo "All tests passed!"
 
 clean:
 	rm -rf obj_dir_*

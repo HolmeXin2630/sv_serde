@@ -1,0 +1,11 @@
+defaults: &defaults
+  color: blue
+  size: large
+
+item1:
+  <<: *defaults
+  name: widget
+
+item2:
+  <<: *defaults
+  name: gadget

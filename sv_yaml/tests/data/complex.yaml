@@ -1,0 +1,73 @@
+# Project configuration
+project: &project_def
+  name: sv_serde
+  version: !!str 1.0.0
+  description: >
+    A SystemVerilog library for
+    JSON and YAML processing
+  authors:
+    - alice
+    - bob
+    - charlie
+
+config:
+  <<: *project_def
+  debug: false
+  timeout_ms: 5000
+  retries: !!int 3
+  pi: 3.14159
+  greeting: |
+    Hello World
+    How are you?
+  endpoints:
+    - host: 10.0.0.1
+      port: 8080
+      tls: true
+    - host: 10.0.0.2
+      port: 8081
+      tls: false
+
+test_data:
+  null_value: null
+  bool_true: true
+  bool_false: false
+  int_zero: 0
+  int_negative: -42
+  float_small: 0.001
+  string_empty: ""
+  empty_list: []
+  empty_map: {}
+  deep_nested:
+    l1:
+      l2:
+        l3:
+          l4:
+            l5:
+              value: deep
+
+flow_map: {x: 1, y: 2, z: 3}
+flow_list: [10, 20, 30, hello, true]
+
+defaults: &defaults
+  color: blue
+  size: large
+
+item1:
+  <<: *defaults
+  name: widget
+
+item2:
+  <<: *defaults
+  name: gadget
+
+summary: |-
+  No trailing newline
+  in this block
+
+icon: !!binary |
+  R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7
+
+---
+# Second document
+status: complete
+timestamp: 2026-05-15

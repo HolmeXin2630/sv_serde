@@ -1,0 +1,11 @@
+name: test
+value: 42
+pi: 3.14
+active: true
+nothing: null
+items:
+  - 1
+  - 2
+  - 3
+nested:
+  key: val
