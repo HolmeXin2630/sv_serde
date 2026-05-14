@@ -67,6 +67,9 @@ string flow = y.yaml_dump_flow();
 
 ```
 your_project/
+├── sv_serde/
+│   └── src/
+│       └── sv_serde.sv            # 统一包（同时导入两个）
 ├── sv_json/
 │   ├── src/
 │   │   ├── sv_json_pkg.sv        # 包 + 类定义
@@ -83,6 +86,16 @@ your_project/
 │   │       ├── sv_yaml_dpi.cc
 │   │       └── rapidyaml-0.12.1.hpp
 │   └── (tests/ — 可选)
+```
+
+### 导入方式
+
+三种导入方式，按需选择：
+
+```systemverilog
+import sv_json_pkg::*;   // 仅 JSON
+import sv_yaml_pkg::*;   // 仅 YAML
+import sv_serde::*;       // 同时包含 JSON 和 YAML
 ```
 
 ### VCS
@@ -120,9 +133,9 @@ xrun -sv -dpiheader sv_json/src/dpi/sv_json_dpi.h \
 ### Verilator（仅用于测试）
 
 ```bash
-make -f Makefile.verilator run_test_json   # JSON 测试（97 个）
-make -f Makefile.verilator run_test_yaml   # YAML 测试（124 个）
-make -f Makefile.verilator run_test_all    # 全部测试（221 个）
+make -f run/Makefile.verilator run_test_json   # JSON 测试（97 个）
+make -f run/Makefile.verilator run_test_yaml   # YAML 测试（124 个）
+make -f run/Makefile.verilator run_test_all    # 全部测试（221 个）
 ```
 
 > **注意：** Verilator 5.x 不支持 SystemVerilog 类。测试套件直接调用 DPI 函数。`sv_json`/`sv_yaml` 类需配合 VCS 和 Xcelium 使用。
@@ -287,16 +300,16 @@ string mode = cfg.value_string("mode", "release");  // 缺失时为 "release"
 
 ```bash
 # 运行全部测试
-make -f Makefile.verilator run_test_all
+make -f run/Makefile.verilator run_test_all
 
 # 仅运行 JSON 测试
-make -f Makefile.verilator run_test_json
+make -f run/Makefile.verilator run_test_json
 
 # 仅运行 YAML 测试
-make -f Makefile.verilator run_test_yaml
+make -f run/Makefile.verilator run_test_yaml
 
 # 清理构建产物
-make -f Makefile.verilator clean
+make -f run/Makefile.verilator clean
 ```
 
 ## 架构

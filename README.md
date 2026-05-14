@@ -67,6 +67,9 @@ Copy the following into your project:
 
 ```
 your_project/
+├── sv_serde/
+│   └── src/
+│       └── sv_serde.sv            # Unified package (imports both)
 ├── sv_json/
 │   ├── src/
 │   │   ├── sv_json_pkg.sv        # Package + class
@@ -83,6 +86,16 @@ your_project/
 │   │       ├── sv_yaml_dpi.cc
 │   │       └── rapidyaml-0.12.1.hpp
 │   └── (tests/ — optional)
+```
+
+### Import Options
+
+Three ways to import, depending on your needs:
+
+```systemverilog
+import sv_json_pkg::*;   // JSON only
+import sv_yaml_pkg::*;   // YAML only
+import sv_serde::*;       // Both JSON and YAML
 ```
 
 ### VCS
@@ -120,9 +133,9 @@ xrun -sv -dpiheader sv_json/src/dpi/sv_json_dpi.h \
 ### Verilator (testing only)
 
 ```bash
-make -f Makefile.verilator run_test_json   # JSON tests (97 tests)
-make -f Makefile.verilator run_test_yaml   # YAML tests (124 tests)
-make -f Makefile.verilator run_test_all    # All tests (221 tests)
+make -f run/Makefile.verilator run_test_json   # JSON tests (97 tests)
+make -f run/Makefile.verilator run_test_yaml   # YAML tests (124 tests)
+make -f run/Makefile.verilator run_test_all    # All tests (221 tests)
 ```
 
 > **Note:** Verilator 5.x does not support SystemVerilog classes. The test suite calls DPI functions directly. The `sv_json`/`sv_yaml` classes work with VCS and Xcelium.
@@ -287,16 +300,16 @@ string mode = cfg.value_string("mode", "release");  // "release" if missing
 
 ```bash
 # Run all tests
-make -f Makefile.verilator run_test_all
+make -f run/Makefile.verilator run_test_all
 
 # Run JSON tests only
-make -f Makefile.verator run_test_json
+make -f run/Makefile.verilator run_test_json
 
 # Run YAML tests only
-make -f Makefile.verilator run_test_yaml
+make -f run/Makefile.verilator run_test_yaml
 
 # Clean build artifacts
-make -f Makefile.verilator clean
+make -f run/Makefile.verilator clean
 ```
 
 ## Architecture

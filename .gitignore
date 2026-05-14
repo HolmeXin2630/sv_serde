@@ -1,0 +1,32 @@
+# Verilator
+obj_dir_*/
+
+# VCS
+simv
+simv.daidir/
+csrc/
+ucli.key
+vc_hdrs.h
+AN.DB/
+DVEfiles/
+inter.vpd
+dumpvars.vcd
+*.vpd
+*.fsdb
+
+# Xcelium
+xcelium.d/
+*.shm/
+*.trn
+*.dsn
+INCA_libs/
+*.irunhistory
+waves.shm/
+
+# General
+*.o
+*.a
+*.so
+*.dylib
+*.log
+*.key
