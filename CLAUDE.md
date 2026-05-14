@@ -5,12 +5,15 @@ SystemVerilog JSON/YAML Processing Library.
 ## Build
 
 ```bash
-make -f Makefile.verilator run_test_json   # JSON only (97 tests)
-make -f Makefile.verilator run_test_yaml   # YAML only (124 tests)
-make -f Makefile.verilator run_test_all    # Both (221 tests)
+make -f run/Makefile.verilator run_test_json   # JSON only (97 tests)
+make -f run/Makefile.verilator run_test_yaml   # YAML only (124 tests)
+make -f run/Makefile.verilator run_test_all    # Both (221 tests)
 ```
 
 ## Structure
+
+### sv_serde (unified)
+- `sv_serde/src/sv_serde.sv` — Unified package importing both sv_json_pkg and sv_yaml_pkg
 
 ### sv_json
 - `sv_json/src/sv_json_pkg.sv` — SV package with types, DPI imports, sv_json class
@@ -27,13 +30,18 @@ make -f Makefile.verilator run_test_all    # Both (221 tests)
 ## Usage
 
 ```systemverilog
-// JSON
+// Unified import (both JSON and YAML)
+import sv_serde::*;
+
+// Or import individually
 import sv_json_pkg::*;
+import sv_yaml_pkg::*;
+
+// JSON
 sv_json j = sv_json::parse("{\"key\":\"value\"}");
 string v = j.get("key").as_string();
 
 // YAML
-import sv_yaml_pkg::*;
 sv_yaml y = sv_yaml::parse("key: value");
 string v2 = y.get("key").as_string();
 ```
