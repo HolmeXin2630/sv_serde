@@ -71,12 +71,81 @@ static int ryml_to_handle(const ryml_ns::Tree& tree, ryml_ns::id_type node) {
 
     if (tree.is_map(node)) {
         yn.type = YamlNode::MAP_VAL;
+
+        // Helper: resolve a merge key's target map
+        auto resolve_merge_target = [&](ryml_ns::id_type child_node) -> int {
+            // The << child might be a map (if alias resolved) or a keyval with alias
+            if (tree.is_map(child_node)) {
+                return ryml_to_handle(tree, child_node);
+            }
+            // Check if the value is an alias reference
+            if (tree.has_val(child_node)) {
+                c4::csubstr val = tree.val(child_node);
+                // val might be "*anchorname" for an alias
+                if (val.len > 1 && val[0] == '*') {
+                    std::string anchor_name(val.str + 1, val.len - 1);
+                    // Search for the anchor in the tree
+                    // Anchors are on map/seq nodes, search from root
+                    ryml_ns::id_type root = tree.root_id();
+                    std::function<ryml_ns::id_type(ryml_ns::id_type, const std::string&)> find_anchor;
+                    find_anchor = [&](ryml_ns::id_type n, const std::string& name) -> ryml_ns::id_type {
+                        if (tree.has_key_anchor(n)) {
+                            c4::csubstr a = tree.key_anchor(n);
+                            if (std::string(a.str, a.len) == name) return n;
+                        }
+                        if (tree.has_val_anchor(n)) {
+                            c4::csubstr a = tree.val_anchor(n);
+                            if (std::string(a.str, a.len) == name) return n;
+                        }
+                        if (tree.has_children(n)) {
+                            ryml_ns::id_type ch = tree.first_child(n);
+                            while (ch != ryml_ns::NONE) {
+                                ryml_ns::id_type found = find_anchor(ch, name);
+                                if (found != ryml_ns::NONE) return found;
+                                ch = tree.next_sibling(ch);
+                            }
+                        }
+                        return ryml_ns::NONE;
+                    };
+                    ryml_ns::id_type target = find_anchor(root, anchor_name);
+                    if (target != ryml_ns::NONE) {
+                        return ryml_to_handle(tree, target);
+                    }
+                }
+            }
+            return 0;
+        };
+
+        // First pass: resolve merge keys (<<)
         if (tree.has_children(node)) {
             ryml_ns::id_type child = tree.first_child(node);
             while (child != ryml_ns::NONE) {
                 std::string key(tree.key(child).str, tree.key(child).len);
-                int vh = ryml_to_handle(tree, child);
-                yn.map_children.push_back({key, vh});
+                if (key == "<<") {
+                    int merge_h = resolve_merge_target(child);
+                    const YamlNode* merge_node = get_node(merge_h);
+                    if (merge_node && merge_node->type == YamlNode::MAP_VAL) {
+                        for (auto& p : merge_node->map_children) {
+                            bool exists = false;
+                            for (auto& existing : yn.map_children) {
+                                if (existing.first == p.first) { exists = true; break; }
+                            }
+                            if (!exists) yn.map_children.push_back(p);
+                        }
+                    }
+                }
+                child = tree.next_sibling(child);
+            }
+        }
+        // Second pass: add non-merge keys
+        if (tree.has_children(node)) {
+            ryml_ns::id_type child = tree.first_child(node);
+            while (child != ryml_ns::NONE) {
+                std::string key(tree.key(child).str, tree.key(child).len);
+                if (key != "<<") {
+                    int vh = ryml_to_handle(tree, child);
+                    yn.map_children.push_back({key, vh});
+                }
                 child = tree.next_sibling(child);
             }
         }
@@ -302,26 +371,50 @@ static std::string emit_yaml_int(int h, int indent_level, bool flow) {
 // ---------------------------------------------------------------------------
 // Parse YAML string/file via rapidyaml
 // ---------------------------------------------------------------------------
+static bool is_file_path(const std::string& s) {
+    // Check for common YAML file extensions or path separators
+    if (s.size() >= 5 && (s.substr(s.size() - 5) == ".yaml")) return true;
+    if (s.size() >= 4 && (s.substr(s.size() - 4) == ".yml")) return true;
+    if (s.find('/') != std::string::npos || s.find('\\') != std::string::npos) {
+        // Has path separators — check if file exists
+        std::ifstream ftest(s);
+        if (ftest.is_open()) return true;
+    }
+    return false;
+}
+
 static int parse_yaml_input(const char* input) {
     if (!input) return 0;
-    try {
-        c4::csubstr cs = c4::to_csubstr(input);
-        ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
-        return ryml_to_handle(tree, tree.root_id());
-    } catch (...) {
-        // Not valid YAML string -- try as file path
+    std::string s(input);
+    std::string content;
+
+    // Try as file first if it looks like a path
+    if (is_file_path(s)) {
         std::ifstream f(input);
         if (f.is_open()) {
-            std::string content((std::istreambuf_iterator<char>(f)),
-                                std::istreambuf_iterator<char>());
-            try {
-                c4::csubstr cs = c4::to_csubstr(content);
-                ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
-                return ryml_to_handle(tree, tree.root_id());
-            } catch (...) {
-                return 0;
+            content = std::string((std::istreambuf_iterator<char>(f)),
+                                  std::istreambuf_iterator<char>());
+        }
+    }
+    if (content.empty()) {
+        content = s;
+    }
+
+    try {
+        c4::csubstr cs = c4::to_csubstr(content);
+        ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
+        ryml_ns::id_type root_id = tree.root_id();
+        // For multi-doc files (--- separator), rapidyaml wraps docs in a SEQ.
+        // Check if root SEQ children are themselves docs (MAPs/SEQs, not scalars).
+        // If so, return just the first document for convenience.
+        if (tree.is_seq(root_id) && tree.has_children(root_id)) {
+            ryml_ns::id_type first = tree.first_child(root_id);
+            if (tree.is_map(first) || (tree.is_seq(first) && tree.has_children(first))) {
+                return ryml_to_handle(tree, first);
             }
         }
+        return ryml_to_handle(tree, root_id);
+    } catch (...) {
         return 0;
     }
 }
@@ -401,8 +494,28 @@ int dpi_yaml_get_type(int h) {
 
 const char* dpi_yaml_as_string(int h) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::STRING_VAL) return "";
-    return n->str_val.c_str();
+    if (!n) return "";
+    switch (n->type) {
+        case YamlNode::STRING_VAL:  return n->str_val.c_str();
+        case YamlNode::INT_VAL: {
+            g_dump_buf = std::to_string(n->int_val);
+            return g_dump_buf.c_str();
+        }
+        case YamlNode::REAL_VAL: {
+            std::ostringstream oss;
+            oss << n->real_val;
+            g_dump_buf = oss.str();
+            return g_dump_buf.c_str();
+        }
+        case YamlNode::BOOL_VAL: {
+            g_dump_buf = n->bool_val ? "true" : "false";
+            return g_dump_buf.c_str();
+        }
+        case YamlNode::NULL_VAL:
+            return "null";
+        default:
+            return "";
+    }
 }
 
 int dpi_yaml_as_int(int h) {
@@ -622,8 +735,23 @@ int dpi_yaml_dump_file(int h, const char* fname, int indent) {
 
 int dpi_yaml_parse_all(const char* input) {
     if (!input) return 0;
+    std::string s(input);
+    std::string content;
+
+    // Try as file first if it looks like a path
+    if (is_file_path(s)) {
+        std::ifstream f(input);
+        if (f.is_open()) {
+            content = std::string((std::istreambuf_iterator<char>(f)),
+                                  std::istreambuf_iterator<char>());
+        }
+    }
+    if (content.empty()) {
+        content = s;
+    }
+
     try {
-        c4::csubstr cs = c4::to_csubstr(input);
+        c4::csubstr cs = c4::to_csubstr(content);
         ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
         YamlNode root;
         root.type = YamlNode::SEQ_VAL;
