@@ -280,6 +280,144 @@ module sv_json_test;
       check_bit("destroy: no crash", 1, 1);
     end
 
+    // === Task 11: Complex JSON file tests ===
+    begin
+      int root_h;
+      int c11_project_h, c11_config_h, c11_endpoints_h, c11_ep0_h, c11_authors_h;
+      int c11_matrix_h, c11_mixed_h, c11_td_h, c11_deep_h;
+      int c11_ep_host_h, c11_deep_val_h, c11_mat_val_h, c11_missing_path_h;
+
+      root_h = dpi_json_parse("sv_json/tests/data/complex.json");
+      check_bit("complex: not null", (root_h != 0) ? 1 : 0, 1);
+      check_bit("complex: is object", dpi_json_is_object(root_h), 1);
+      check_int("complex: root has 4 keys", dpi_json_size(root_h), 4);
+
+      // Navigate nested objects
+      c11_project_h = dpi_json_get(root_h, "project");
+      check("complex: project.name", dpi_json_as_string(dpi_json_get(c11_project_h, "name")), "sv_serde");
+      check("complex: project.version", dpi_json_as_string(dpi_json_get(c11_project_h, "version")), "1.0.0");
+
+      // Nested array access
+      c11_authors_h = dpi_json_get(c11_project_h, "authors");
+      check_int("complex: authors size", dpi_json_size(c11_authors_h), 3);
+      check("complex: authors[0]", dpi_json_as_string(dpi_json_at(c11_authors_h, 0)), "alice");
+
+      // Deep nested: project.config.endpoints[0].host
+      c11_config_h = dpi_json_get(c11_project_h, "config");
+      c11_endpoints_h = dpi_json_get(c11_config_h, "endpoints");
+      c11_ep0_h = dpi_json_at(c11_endpoints_h, 0);
+      check("complex: endpoint host", dpi_json_as_string(dpi_json_get(c11_ep0_h, "host")), "10.0.0.1");
+      check_int("complex: endpoint port", dpi_json_as_int(dpi_json_get(c11_ep0_h, "port")), 8080);
+      check_bit("complex: endpoint tls", dpi_json_as_bool(dpi_json_get(c11_ep0_h, "tls")), 1);
+
+      // Matrix: matrix[1][2] == 6
+      c11_matrix_h = dpi_json_get(root_h, "matrix");
+      check_int("complex: matrix[1][2]", dpi_json_as_int(dpi_json_at(dpi_json_at(c11_matrix_h, 1), 2)), 6);
+
+      // Mixed array types
+      c11_mixed_h = dpi_json_get(root_h, "mixed_array");
+      check_int("complex: mixed[0] int", dpi_json_as_int(dpi_json_at(c11_mixed_h, 0)), 1);
+      check("complex: mixed[1] string", dpi_json_as_string(dpi_json_at(c11_mixed_h, 1)), "two");
+      check_bit("complex: mixed[2] bool", dpi_json_as_bool(dpi_json_at(c11_mixed_h, 2)), 1);
+      check_bit("complex: mixed[3] null", dpi_json_is_null(dpi_json_at(c11_mixed_h, 3)), 1);
+      check_bit("complex: mixed[4] real", dpi_json_is_real(dpi_json_at(c11_mixed_h, 4)), 1);
+      check_bit("complex: mixed[5] object", dpi_json_is_object(dpi_json_at(c11_mixed_h, 5)), 1);
+      check_bit("complex: mixed[6] array", dpi_json_is_array(dpi_json_at(c11_mixed_h, 6)), 1);
+
+      // Test data types
+      c11_td_h = dpi_json_get(root_h, "test_data");
+      check_bit("complex: null_value", dpi_json_is_null(dpi_json_get(c11_td_h, "null_value")), 1);
+      check_bit("complex: bool_true", dpi_json_as_bool(dpi_json_get(c11_td_h, "bool_true")), 1);
+      check_bit("complex: bool_false", dpi_json_as_bool(dpi_json_get(c11_td_h, "bool_false")), 0);
+      check_int("complex: int_zero", dpi_json_as_int(dpi_json_get(c11_td_h, "int_zero")), 0);
+      check_int("complex: int_negative", dpi_json_as_int(dpi_json_get(c11_td_h, "int_negative")), -42);
+      check("complex: string_empty", dpi_json_as_string(dpi_json_get(c11_td_h, "string_empty")), "");
+      check_bit("complex: array_empty", dpi_json_empty(dpi_json_get(c11_td_h, "array_empty")), 1);
+      check_bit("complex: object_empty", dpi_json_empty(dpi_json_get(c11_td_h, "object_empty")), 1);
+
+      // Deep nesting
+      c11_deep_h = dpi_json_get(dpi_json_get(dpi_json_get(dpi_json_get(dpi_json_get(c11_td_h, "deep_nested"), "l1"), "l2"), "l3"), "l4");
+      c11_deep_h = dpi_json_get(c11_deep_h, "l5");
+      check("complex: deep value", dpi_json_as_string(dpi_json_get(c11_deep_h, "value")), "deep");
+
+      // Path access
+      c11_ep_host_h = dpi_json_at_path(root_h, "/project/config/endpoints/0/host");
+      check("complex: at_path endpoint", dpi_json_as_string(c11_ep_host_h), "10.0.0.1");
+
+      c11_deep_val_h = dpi_json_at_path(root_h, "/test_data/deep_nested/l1/l2/l3/l4/l5/value");
+      check("complex: at_path deep", dpi_json_as_string(c11_deep_val_h), "deep");
+
+      c11_mat_val_h = dpi_json_at_path(root_h, "/matrix/1/2");
+      check_int("complex: at_path matrix", dpi_json_as_int(c11_mat_val_h), 6);
+
+      c11_missing_path_h = dpi_json_at_path(root_h, "/nonexistent/path");
+      check_bit("complex: at_path missing null", (c11_missing_path_h == 0) ? 1 : 0, 1);
+
+      // contains on null values
+      check_bit("complex: contains null_value", dpi_json_contains(c11_td_h, "null_value"), 1);
+    end
+
+    // === Task 12: Round-trip + edge cases ===
+    begin
+      int c12_orig_h, c12_dumped_h;
+      int c12_data_h, c12_read_back_h;
+      int c12_empty_str_h, c12_unicode_h, c12_large_h, c12_neg_h, c12_zero_h;
+
+      // Round-trip: dump then re-parse
+      c12_orig_h = dpi_json_parse("{\"a\":1,\"b\":\"hello\",\"c\":[1,2,3]}");
+      c12_dumped_h = dpi_json_parse(dpi_json_dump(c12_orig_h, -1));
+      check_int("round-trip: a", dpi_json_as_int(dpi_json_get(c12_dumped_h, "a")), 1);
+      check("round-trip: b", dpi_json_as_string(dpi_json_get(c12_dumped_h, "b")), "hello");
+      check_int("round-trip: c size", dpi_json_size(dpi_json_get(c12_dumped_h, "c")), 3);
+
+      // File dump and re-read
+      c12_data_h = dpi_json_parse("{\"x\":100}");
+      check_int("dump_file: success", dpi_json_dump_file(c12_data_h, "sv_json/tests/data/out_test.json", 2), 0);
+      c12_read_back_h = dpi_json_parse("sv_json/tests/data/out_test.json");
+      check_int("dump_file: round-trip", dpi_json_as_int(dpi_json_get(c12_read_back_h, "x")), 100);
+
+      // Edge cases
+      c12_empty_str_h = dpi_json_parse("\"\"");
+      check("edge: empty string", dpi_json_as_string(c12_empty_str_h), "");
+
+      c12_unicode_h = dpi_json_parse("\"hello \\u4e16\\u754c\"");
+      check("edge: unicode", dpi_json_as_string(c12_unicode_h), "hello 世界");
+
+      c12_large_h = dpi_json_parse("2147483647");
+      check_int("edge: large int", dpi_json_as_int(c12_large_h), 2147483647);
+
+      c12_neg_h = dpi_json_parse("-42");
+      check_int("edge: negative", dpi_json_as_int(c12_neg_h), -42);
+
+      c12_zero_h = dpi_json_parse("0");
+      check_int("edge: zero", dpi_json_as_int(c12_zero_h), 0);
+    end
+
+    // === Task 13: JSON Pointer edge cases ===
+    begin
+      int c13_ptr_h, c13_tilde_h, c13_slash_h, c13_nested_slash_h;
+      int c13_arr_root_h, c13_arr_el_h;
+
+      c13_ptr_h = dpi_json_parse("{\"~0\":\"tilde\",\"~1\":\"slash\",\"a/b\":{\"c\":1}}");
+
+      // ~0 escapes to ~ so /~00 accesses key ~0
+      c13_tilde_h = dpi_json_at_path(c13_ptr_h, "/~00");
+      check("pointer: ~0 tilde", dpi_json_as_string(c13_tilde_h), "tilde");
+
+      // ~1 escapes to / so /~01 accesses key ~1
+      c13_slash_h = dpi_json_at_path(c13_ptr_h, "/~01");
+      check("pointer: ~1 slash", dpi_json_as_string(c13_slash_h), "slash");
+
+      // Nested key with / in name
+      c13_nested_slash_h = dpi_json_at_path(c13_ptr_h, "/a~1b/c");
+      check_int("pointer: nested slash key", dpi_json_as_int(c13_nested_slash_h), 1);
+
+      // Root array
+      c13_arr_root_h = dpi_json_parse("[[1,2],[3,4]]");
+      c13_arr_el_h = dpi_json_at_path(c13_arr_root_h, "/1/0");
+      check_int("pointer: array root", dpi_json_as_int(c13_arr_el_h), 3);
+    end
+
     $display("\nBasic tests: %0d passed, %0d failed", pass_count, fail_count);
     if (fail_count > 0) $finish(1);
     $finish;
