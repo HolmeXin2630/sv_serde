@@ -156,19 +156,20 @@ make -f run/Makefile.verilator run_test_all    # All tests (221 tests)
 | `::from_real(real)` | object | Float value |
 | `::from_bool(bit)` | object | Boolean value |
 | `::make_null()` | object | Null value |
+| `::set_strict_mode(bit)` | void | Enable/disable strict error mode |
 
 #### Type Check
 
-| Method | Returns |
-|--------|---------|
-| `.is_null()` | `bit` |
-| `.is_boolean()` | `bit` |
-| `.is_int()` | `bit` |
-| `.is_real()` | `bit` |
-| `.is_number()` | `bit` (int or real) |
-| `.is_string()` | `bit` |
-| `.is_array()` | `bit` |
-| `.is_object()` | `bit` |
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `.is_null()` | `bit` | True if null |
+| `.is_boolean()` | `bit` | True if boolean |
+| `.is_int()` | `bit` | True if integer |
+| `.is_real()` | `bit` | True if float |
+| `.is_number()` | `bit` | True if integer or float |
+| `.is_string()` | `bit` | True if string |
+| `.is_array()` | `bit` | True if array |
+| `.is_object()` | `bit` | True if object |
 
 #### Value Extraction
 
@@ -215,7 +216,7 @@ All return a **new** object. Original unchanged.
 |--------|---------|-------------|
 | `.dump()` | `string` | Pretty-printed string |
 | `.dump("", -1)` | `string` | Compact string |
-| `.dump("file.json")` | `string` | Write to file |
+| `.dump("file.json")` | `string` | Write to file, returns `"ok"` or `"error"` |
 | `.dump_file(fname, indent)` | `int` | Write to file (returns 0 on success) |
 
 ### YAML-Specific API

@@ -156,19 +156,20 @@ make -f run/Makefile.verilator run_test_all    # 全部测试（221 个）
 | `::from_real(real)` | object | 浮点值 |
 | `::from_bool(bit)` | object | 布尔值 |
 | `::make_null()` | object | 空值 |
+| `::set_strict_mode(bit)` | void | 启用/禁用严格错误模式 |
 
 #### 类型检查
 
-| 方法 | 返回值 |
-|------|--------|
-| `.is_null()` | `bit` |
-| `.is_boolean()` | `bit` |
-| `.is_int()` | `bit` |
-| `.is_real()` | `bit` |
-| `.is_number()` | `bit`（整数或浮点） |
-| `.is_string()` | `bit` |
-| `.is_array()` | `bit` |
-| `.is_object()` | `bit` |
+| 方法 | 返回值 | 说明 |
+|------|--------|------|
+| `.is_null()` | `bit` | 是否为空值 |
+| `.is_boolean()` | `bit` | 是否为布尔值 |
+| `.is_int()` | `bit` | 是否为整数 |
+| `.is_real()` | `bit` | 是否为浮点数 |
+| `.is_number()` | `bit` | 是否为数字（整数或浮点） |
+| `.is_string()` | `bit` | 是否为字符串 |
+| `.is_array()` | `bit` | 是否为数组 |
+| `.is_object()` | `bit` | 是否为对象 |
 
 #### 值提取
 
@@ -215,7 +216,7 @@ make -f run/Makefile.verilator run_test_all    # 全部测试（221 个）
 |------|--------|------|
 | `.dump()` | `string` | 格式化字符串 |
 | `.dump("", -1)` | `string` | 紧凑字符串 |
-| `.dump("file.json")` | `string` | 写入文件 |
+| `.dump("file.json")` | `string` | 写入文件，返回 `"ok"` 或 `"error"` |
 | `.dump_file(fname, indent)` | `int` | 写入文件（成功返回 0） |
 
 ### YAML 专有 API
