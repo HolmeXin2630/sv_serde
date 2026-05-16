@@ -266,8 +266,7 @@ package sv_yaml_pkg;
     static function sv_yaml yaml_parse_all(string input_str);
       int h = dpi_yaml_parse_all(input_str);
       if (h == 0) return null;
-      sv_yaml result;
-      result = new();
+      s_tmp = new();
       s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return s_tmp;
     endfunction
@@ -279,8 +278,7 @@ package sv_yaml_pkg;
     function sv_yaml yaml_set_comment(string text);
       int h = dpi_yaml_set_comment(m_handle, text);
       if (h == 0) return null;
-      sv_yaml result;
-      result = new();
+      s_tmp = new();
       s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return s_tmp;
     endfunction
@@ -292,8 +290,7 @@ package sv_yaml_pkg;
     function sv_yaml yaml_set_anchor(string name);
       int h = dpi_yaml_set_anchor(m_handle, name);
       if (h == 0) return null;
-      sv_yaml result;
-      result = new();
+      s_tmp = new();
       s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return s_tmp;
     endfunction
@@ -309,8 +306,7 @@ package sv_yaml_pkg;
     function sv_yaml yaml_set_tag(string tag);
       int h = dpi_yaml_set_tag(m_handle, tag);
       if (h == 0) return null;
-      sv_yaml result;
-      result = new();
+      s_tmp = new();
       s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return s_tmp;
     endfunction
