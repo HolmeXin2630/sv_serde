@@ -1,19 +1,28 @@
 package sv_yaml_pkg;
 
-  typedef enum int {
-    SV_YAML_NULL    = 0,
-    SV_YAML_BOOLEAN = 1,
-    SV_YAML_INT     = 2,
-    SV_YAML_REAL    = 3,
-    SV_YAML_STRING  = 4,
-    SV_YAML_ARRAY   = 5,
-    SV_YAML_OBJECT  = 6
-  } sv_yaml_type_e;
+  import sv_serde_pkg::sv_serde_type_e;
+  import sv_serde_pkg::SERDE_NULL;
+  import sv_serde_pkg::SERDE_BOOL;
+  import sv_serde_pkg::SERDE_INT;
+  import sv_serde_pkg::SERDE_REAL;
+  import sv_serde_pkg::SERDE_STRING;
+  import sv_serde_pkg::SERDE_ARRAY;
+  import sv_serde_pkg::SERDE_OBJECT;
+
+  // Backward-compat type alias and constants
+  typedef sv_serde_type_e sv_yaml_type_e;
+  localparam SV_YAML_NULL    = SERDE_NULL;
+  localparam SV_YAML_BOOLEAN = SERDE_BOOL;
+  localparam SV_YAML_INT     = SERDE_INT;
+  localparam SV_YAML_REAL    = SERDE_REAL;
+  localparam SV_YAML_STRING  = SERDE_STRING;
+  localparam SV_YAML_ARRAY   = SERDE_ARRAY;
+  localparam SV_YAML_OBJECT  = SERDE_OBJECT;
 
   // DPI imports — lifecycle
+  import "DPI-C" function int    dpi_yaml_parse(input string input_str);
   import "DPI-C" function int    dpi_yaml_new_object();
   import "DPI-C" function int    dpi_yaml_new_array();
-  import "DPI-C" function int    dpi_yaml_parse(input string input_str);
   import "DPI-C" function void   dpi_yaml_destroy(input int handle);
   import "DPI-C" function int    dpi_yaml_clone(input int handle);
   import "DPI-C" function void   dpi_yaml_free(input int handle);
@@ -76,278 +85,209 @@ package sv_yaml_pkg;
   import "DPI-C" function string dpi_yaml_dump_flow(input int h);
   import "DPI-C" function string dpi_yaml_dump_with_comments(input int h);
 
-  // Strict mode flag
-  bit strict_mode = 0;
+  // DPI imports — error reporting
+  import "DPI-C" function string dpi_serde_last_error();
 
-  class sv_yaml;
-    local int m_handle;
-    local sv_yaml_type_e m_type;
+  `include "sv_serde_base.svh"
 
-    local function new(int handle, sv_yaml_type_e yaml_type);
-      m_handle = handle;
-      m_type = yaml_type;
+  class sv_yaml extends sv_serde_base;
+
+    function new(int handle, sv_serde_type_e yaml_type);
+      super.new(handle, yaml_type);
     endfunction
 
-    static function sv_yaml parse(string input_str);
-      int h = dpi_yaml_parse(input_str);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+    // --- DPI dispatch virtual overrides (one-liner delegates) ---
+    function int   dpi_parse(string s);           return dpi_yaml_parse(s);           endfunction
+    function int   dpi_new_object();              return dpi_yaml_new_object();       endfunction
+    function int   dpi_new_array();               return dpi_yaml_new_array();        endfunction
+    function int   dpi_create_string(string v);   return dpi_yaml_create_string(v);   endfunction
+    function int   dpi_create_int_val(int v);     return dpi_yaml_create_int_val(v);  endfunction
+    function int   dpi_create_float_val(real v);  return dpi_yaml_create_float_val(v);endfunction
+    function int   dpi_create_bool_val(int v);    return dpi_yaml_create_bool_val(v); endfunction
+    function int   dpi_create_null();             return dpi_yaml_create_null();      endfunction
+    function int   dpi_get(int h, string k);      return dpi_yaml_get(h, k);          endfunction
+    function int   dpi_at(int h, int i);          return dpi_yaml_at(h, i);           endfunction
+    function int   dpi_at_path(int h, string p);  return dpi_yaml_at_path(h, p);      endfunction
+    function int   dpi_contains(int h, string k); return dpi_yaml_contains(h, k);     endfunction
+    function int   dpi_empty(int h);              return dpi_yaml_empty(h);           endfunction
+    function int   dpi_size(int h);               return dpi_yaml_size(h);            endfunction
+    function string dpi_key_at(int h, int i);     return dpi_yaml_key_at(h, i);       endfunction
+    function int    dpi_set(int h, string k, int v);       return dpi_yaml_set(h, k, v);       endfunction
+    function int    dpi_push(int h, int v);               return dpi_yaml_push(h, v);          endfunction
+    function int    dpi_insert_at(int h, int i, int v);   return dpi_yaml_insert_at(h, i, v);  endfunction
+    function int    dpi_remove(int h, string k);          return dpi_yaml_remove(h, k);        endfunction
+    function int    dpi_remove_at(int h, int i);          return dpi_yaml_remove_at(h, i);     endfunction
+    function int    dpi_update(int h, int o);             return dpi_yaml_update(h, o);        endfunction
+    function int    dpi_set_string(int h, string k, string v); return dpi_yaml_set_string(h, k, v); endfunction
+    function int    dpi_set_int(int h, string k, int v);      return dpi_yaml_set_int(h, k, v);      endfunction
+    function int    dpi_set_float(int h, string k, real v);   return dpi_yaml_set_float(h, k, v);    endfunction
+    function int    dpi_set_bool(int h, string k, int v);     return dpi_yaml_set_bool(h, k, v);     endfunction
+    function int    dpi_set_null(int h, string k);            return dpi_yaml_set_null(h, k);        endfunction
+    function string dpi_as_string(int h);     return dpi_yaml_as_string(h);     endfunction
+    function int    dpi_as_int(int h);         return dpi_yaml_as_int(h);       endfunction
+    function real   dpi_as_real(int h);        return dpi_yaml_as_real(h);      endfunction
+    function int    dpi_as_bool(int h);        return dpi_yaml_as_bool(h);      endfunction
+    function string dpi_dump(int h, int i);    return dpi_yaml_dump(h, i);      endfunction
+    function int    dpi_dump_file(int h, string f, int i); return dpi_yaml_dump_file(h, f, i); endfunction
+    function int    dpi_clone(int h);          return dpi_yaml_clone(h);        endfunction
+    function void   dpi_destroy(int h);        dpi_yaml_free(h);               endfunction
+    function int    dpi_is_valid(int h);       return dpi_yaml_is_valid(h);    endfunction
+    function string dpi_last_error();          return dpi_serde_last_error();  endfunction
+    function int    dpi_get_type(int h);        return dpi_yaml_get_type(h);   endfunction
+
+    // --- Factory method ---
+    function sv_serde_base make_child(int h, sv_serde_type_e t);
+      sv_yaml child = new(h, t);
+      child.m_strict_mode = this.m_strict_mode;
+      return child;
     endfunction
 
-    static function sv_yaml new_object();
-      sv_yaml tmp = new(dpi_yaml_new_object(), SV_YAML_OBJECT);
-      return tmp;
-    endfunction
-
-    static function sv_yaml new_array();
-      sv_yaml tmp = new(dpi_yaml_new_array(), SV_YAML_ARRAY);
-      return tmp;
-    endfunction
-
-    static function sv_yaml from_string(string val);
-      sv_yaml tmp = new(dpi_yaml_create_string(val), SV_YAML_STRING);
-      return tmp;
-    endfunction
-
-    static function sv_yaml from_int(int val);
-      sv_yaml tmp = new(dpi_yaml_create_int_val(val), SV_YAML_INT);
-      return tmp;
-    endfunction
-
-    static function sv_yaml from_real(real val);
-      sv_yaml tmp = new(dpi_yaml_create_float_val(val), SV_YAML_REAL);
-      return tmp;
-    endfunction
-
-    static function sv_yaml from_bool(bit val);
-      sv_yaml tmp = new(dpi_yaml_create_bool_val(val ? 1 : 0), SV_YAML_BOOLEAN);
-      return tmp;
-    endfunction
-
-    static function sv_yaml make_null();
-      sv_yaml tmp = new(dpi_yaml_create_null(), SV_YAML_NULL);
-      return tmp;
-    endfunction
-
-    static function void set_strict_mode(bit enable);
-      strict_mode = enable;
-    endfunction
-
-    function bit is_null();    return m_type == SV_YAML_NULL;    endfunction
-    function bit is_boolean(); return m_type == SV_YAML_BOOLEAN; endfunction
-    function bit is_int();     return m_type == SV_YAML_INT;     endfunction
-    function bit is_real();    return m_type == SV_YAML_REAL;    endfunction
-    function bit is_string();  return m_type == SV_YAML_STRING;  endfunction
-    function bit is_array();   return m_type == SV_YAML_ARRAY;   endfunction
-    function bit is_object();  return m_type == SV_YAML_OBJECT;  endfunction
-
-    function bit is_number();
-      return is_int() || is_real();
-    endfunction
-
-    function sv_yaml_type_e get_type(); return m_type; endfunction
-
-    function string as_string();
-      if (strict_mode && !is_string()) $fatal(1, "Not a string");
-      return dpi_yaml_as_string(m_handle);
-    endfunction
-
-    function int as_int();
-      if (strict_mode && !is_int()) $fatal(1, "Not an int");
-      return dpi_yaml_as_int(m_handle);
-    endfunction
-
-    function real as_real();
-      if (strict_mode && !is_real()) $fatal(1, "Not a real");
-      return dpi_yaml_as_real(m_handle);
-    endfunction
-
-    function bit as_bool();
-      if (strict_mode && !is_boolean()) $fatal(1, "Not a boolean");
-      return dpi_yaml_as_bool(m_handle);
-    endfunction
-
-    function string value_string(string key, string default_val);
-      sv_yaml v = get(key);
-      if (v == null) return default_val;
-      if (!v.is_string()) return default_val;
-      return v.as_string();
-    endfunction
-
-    function int value_int(string key, int default_val);
-      sv_yaml v = get(key);
-      if (v == null) return default_val;
-      if (!v.is_int()) return default_val;
-      return v.as_int();
-    endfunction
-
-    function real value_real(string key, real default_val);
-      sv_yaml v = get(key);
-      if (v == null) return default_val;
-      if (!v.is_real()) return default_val;
-      return v.as_real();
-    endfunction
-
-    function bit value_bool(string key, bit default_val);
-      sv_yaml v = get(key);
-      if (v == null) return default_val;
-      if (!v.is_boolean()) return default_val;
-      return v.as_bool();
-    endfunction
-
+    // --- Public accessors (shadow base _xxx methods with correct return type) ---
     function sv_yaml get(string key);
-      int h = dpi_yaml_get(m_handle, key);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._get(key);
+      if (v == null) return null;
+      $cast(get, v);
     endfunction
 
     function sv_yaml at(int idx);
-      int h = dpi_yaml_at(m_handle, idx);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._at(idx);
+      if (v == null) return null;
+      $cast(at, v);
     endfunction
 
     function sv_yaml at_path(string path);
-      int h = dpi_yaml_at_path(m_handle, path);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
-    endfunction
-
-    function bit contains(string key); return dpi_yaml_contains(m_handle, key); endfunction
-    function bit empty(); return dpi_yaml_empty(m_handle); endfunction
-    function int size(); return dpi_yaml_size(m_handle); endfunction
-    function string key_at(int idx); return dpi_yaml_key_at(m_handle, idx); endfunction
-
-    function void get_keys(output string keys[$]);
-      int n;
-      keys = {};
-      if (!is_object()) return;
-      n = size();
-      for (int i = 0; i < n; i++) begin
-        keys.push_back(key_at(i));
-      end
+      sv_serde_base v = super._at_path(path);
+      if (v == null) return null;
+      $cast(at_path, v);
     endfunction
 
     function sv_yaml set(string key, sv_yaml value);
-      int h = dpi_yaml_set(m_handle, key, value.m_handle);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._set(key, value);
+      if (v == null) return null;
+      $cast(set, v);
     endfunction
 
     function sv_yaml push(sv_yaml value);
-      int h = dpi_yaml_push(m_handle, value.m_handle);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._push(value);
+      if (v == null) return null;
+      $cast(push, v);
     endfunction
 
     function sv_yaml insert_at(int idx, sv_yaml value);
-      int h = dpi_yaml_insert_at(m_handle, idx, value.m_handle);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._insert_at(idx, value);
+      if (v == null) return null;
+      $cast(insert_at, v);
     endfunction
 
     function sv_yaml remove(string key);
-      int h = dpi_yaml_remove(m_handle, key);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._remove(key);
+      if (v == null) return null;
+      $cast(remove, v);
     endfunction
 
     function sv_yaml remove_at(int idx);
-      int h = dpi_yaml_remove_at(m_handle, idx);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._remove_at(idx);
+      if (v == null) return null;
+      $cast(remove_at, v);
     endfunction
 
     function sv_yaml update(sv_yaml other);
-      int h = dpi_yaml_update(m_handle, other.m_handle);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._update(other);
+      if (v == null) return null;
+      $cast(update, v);
     endfunction
-
-    function string dump(string fname = "", int indent = 2);
-      if (fname != "") begin
-        int rc = dpi_yaml_dump_file(m_handle, fname, indent);
-        return (rc == 0) ? "ok" : "error";
-      end
-      return dpi_yaml_dump(m_handle, indent);
-    endfunction
-
-    function int dump_file(string fname, int indent = 2);
-      return dpi_yaml_dump_file(m_handle, fname, indent);
-    endfunction
-
-    // YAML-specific
-    static function sv_yaml yaml_parse_all(string input_str);
-      int h = dpi_yaml_parse_all(input_str);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
-    endfunction
-
-    function string yaml_comments(); return dpi_yaml_comments(m_handle); endfunction
-    function sv_yaml yaml_set_comment(string text);
-      int h = dpi_yaml_set_comment(m_handle, text);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
-    endfunction
-
-    function string yaml_anchor(); return dpi_yaml_anchor(m_handle); endfunction
-    function sv_yaml yaml_set_anchor(string name);
-      int h = dpi_yaml_set_anchor(m_handle, name);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
-    endfunction
-
-    function string yaml_alias(); return dpi_yaml_alias(m_handle); endfunction
-    function string yaml_tag(); return dpi_yaml_tag(m_handle); endfunction
-    function sv_yaml yaml_set_tag(string tag);
-      int h = dpi_yaml_set_tag(m_handle, tag);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
-    endfunction
-
-    function string yaml_dump_flow(); return dpi_yaml_dump_flow(m_handle); endfunction
-    function string yaml_dump_with_comments(); return dpi_yaml_dump_with_comments(m_handle); endfunction
-
-    // --- Lifecycle ---
 
     function sv_yaml clone();
-      int h = dpi_yaml_clone(m_handle);
-      sv_yaml tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._clone();
+      if (v == null) return null;
+      $cast(clone, v);
     endfunction
 
-    function bit is_valid();
-      return dpi_yaml_is_valid(m_handle);
+    // --- Static factory methods ---
+    static function sv_yaml parse(string input_str);
+      int h = dpi_yaml_parse(input_str);
+      if (h == 0) return null;
+      return new(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+    endfunction
+
+    static function sv_yaml new_object();
+      return new(dpi_yaml_new_object(), SERDE_OBJECT);
+    endfunction
+
+    static function sv_yaml new_array();
+      return new(dpi_yaml_new_array(), SERDE_ARRAY);
+    endfunction
+
+    static function sv_yaml from_string(string val);
+      return new(dpi_yaml_create_string(val), SERDE_STRING);
+    endfunction
+
+    static function sv_yaml from_int(int val);
+      return new(dpi_yaml_create_int_val(val), SERDE_INT);
+    endfunction
+
+    static function sv_yaml from_real(real val);
+      return new(dpi_yaml_create_float_val(val), SERDE_REAL);
+    endfunction
+
+    static function sv_yaml from_bool(bit val);
+      return new(dpi_yaml_create_bool_val(val ? 1 : 0), SERDE_BOOL);
+    endfunction
+
+    static function sv_yaml make_null();
+      return new(dpi_yaml_create_null(), SERDE_NULL);
+    endfunction
+
+    // --- YAML-specific methods ---
+    static function sv_yaml yaml_parse_all(string input_str);
+      int h = dpi_yaml_parse_all(input_str);
+      if (h == 0) return null;
+      return new(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+    endfunction
+
+    function string yaml_comments();
+      return dpi_yaml_comments(m_handle);
+    endfunction
+
+    function sv_yaml yaml_set_comment(string text);
+      int h = dpi_yaml_set_comment(m_handle, text);
+      if (h == 0) return null;
+      sv_yaml result = new(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      return result;
+    endfunction
+
+    function string yaml_anchor();
+      return dpi_yaml_anchor(m_handle);
+    endfunction
+
+    function sv_yaml yaml_set_anchor(string name);
+      int h = dpi_yaml_set_anchor(m_handle, name);
+      if (h == 0) return null;
+      sv_yaml result = new(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      return result;
+    endfunction
+
+    function string yaml_alias();
+      return dpi_yaml_alias(m_handle);
+    endfunction
+
+    function string yaml_tag();
+      return dpi_yaml_tag(m_handle);
+    endfunction
+
+    function sv_yaml yaml_set_tag(string tag);
+      int h = dpi_yaml_set_tag(m_handle, tag);
+      if (h == 0) return null;
+      sv_yaml result = new(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      return result;
+    endfunction
+
+    function string yaml_dump_flow();
+      return dpi_yaml_dump_flow(m_handle);
+    endfunction
+
+    function string yaml_dump_with_comments();
+      return dpi_yaml_dump_with_comments(m_handle);
     endfunction
 
   endclass

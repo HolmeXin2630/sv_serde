@@ -3,12 +3,12 @@
 // This is an `include file; the includer must have sv_serde_type_e and
 // SERDE_* constants in scope (via import sv_serde_pkg::*).
 //
-// Methods returning child object handles (get, at, at_path, set, push,
-// insert_at, remove, remove_at, update, clone) are declared here as
-// non-virtual returning sv_serde_base so that value_*() and other internal
-// helpers can call them.  Each concrete subclass shadows these with
-// public versions returning the correct type — the shadow methods delegate
-// to the base implementation via super.<method>() and $cast.
+// Internal accessor/modifier/clone methods are prefixed with '_' and
+// return sv_serde_base.  Each concrete subclass provides the public
+// versions (without '_') returning the correct concrete type.  The public
+// versions call the protected '_' methods via super and $cast the result.
+// This avoids relying on SV covariant return types which are not
+// universally supported across simulators.
 
 virtual class sv_serde_base;
   protected int m_handle;
@@ -124,31 +124,31 @@ virtual class sv_serde_base;
   endfunction
 
   // -----------------------------------------------------------------------
-  // Value access with defaults
+  // Value access with defaults (calls _get(), returns scalars)
   // -----------------------------------------------------------------------
   function string value_string(string key, string default_val);
-    sv_serde_base v = get(key);
+    sv_serde_base v = _get(key);
     if (v == null) return default_val;
     if (!v.is_string()) return default_val;
     return v.as_string();
   endfunction
 
   function int value_int(string key, int default_val);
-    sv_serde_base v = get(key);
+    sv_serde_base v = _get(key);
     if (v == null) return default_val;
     if (!v.is_int()) return default_val;
     return v.as_int();
   endfunction
 
   function real value_real(string key, real default_val);
-    sv_serde_base v = get(key);
+    sv_serde_base v = _get(key);
     if (v == null) return default_val;
     if (!v.is_real()) return default_val;
     return v.as_real();
   endfunction
 
   function bit value_bool(string key, bit default_val);
-    sv_serde_base v = get(key);
+    sv_serde_base v = _get(key);
     if (v == null) return default_val;
     if (!v.is_boolean()) return default_val;
     return v.as_bool();
@@ -182,66 +182,62 @@ virtual class sv_serde_base;
   endfunction
 
   // -----------------------------------------------------------------------
-  // Child accessors — non-virtual, return sv_serde_base.
-  // Subclasses SHADOW these with public versions returning the concrete
-  // type (sv_json / sv_yaml).  The shadow methods delegate here via super
-  // and $cast the result.  value_*() helpers above call these base versions
-  // and work correctly with the opaque sv_serde_base handle.
+  // Internal accessors — protected, return sv_serde_base.
+  // Concrete subclasses provide public wrappers that call super._xxx()
+  // and $cast to the correct concrete type.
   // -----------------------------------------------------------------------
-  function sv_serde_base get(string key);
+  protected function sv_serde_base _get(string key);
     int h = dpi_get(m_handle, key);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
   endfunction
 
-  function sv_serde_base at(int idx);
+  protected function sv_serde_base _at(int idx);
     int h = dpi_at(m_handle, idx);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
   endfunction
 
-  function sv_serde_base at_path(string path);
+  protected function sv_serde_base _at_path(string path);
     int h = dpi_at_path(m_handle, path);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
   endfunction
 
   // -----------------------------------------------------------------------
-  // Modification helpers — non-virtual, return sv_serde_base.
-  // Same pattern: subclass shadows with public versions returning the
-  // concrete type.
+  // Internal modifiers — protected, return sv_serde_base.
   // -----------------------------------------------------------------------
-  function sv_serde_base set(string key, sv_serde_base value);
+  protected function sv_serde_base _set(string key, sv_serde_base value);
     int h = dpi_set(m_handle, key, value.m_handle);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
   endfunction
 
-  function sv_serde_base push(sv_serde_base value);
+  protected function sv_serde_base _push(sv_serde_base value);
     int h = dpi_push(m_handle, value.m_handle);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
   endfunction
 
-  function sv_serde_base insert_at(int idx, sv_serde_base value);
+  protected function sv_serde_base _insert_at(int idx, sv_serde_base value);
     int h = dpi_insert_at(m_handle, idx, value.m_handle);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
   endfunction
 
-  function sv_serde_base remove(string key);
+  protected function sv_serde_base _remove(string key);
     int h = dpi_remove(m_handle, key);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
   endfunction
 
-  function sv_serde_base remove_at(int idx);
+  protected function sv_serde_base _remove_at(int idx);
     int h = dpi_remove_at(m_handle, idx);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
   endfunction
 
-  function sv_serde_base update(sv_serde_base other);
+  protected function sv_serde_base _update(sv_serde_base other);
     int h = dpi_update(m_handle, other.m_handle);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));
@@ -265,7 +261,7 @@ virtual class sv_serde_base;
   // -----------------------------------------------------------------------
   // Lifecycle
   // -----------------------------------------------------------------------
-  function sv_serde_base clone();
+  protected function sv_serde_base _clone();
     int h = dpi_clone(m_handle);
     if (h == 0) return null;
     return make_child(h, sv_serde_type_e'(dpi_get_type(h)));

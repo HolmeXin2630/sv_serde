@@ -1,20 +1,28 @@
 package sv_json_pkg;
 
-  // Type enum
-  typedef enum int {
-    SV_JSON_NULL    = 0,
-    SV_JSON_BOOLEAN = 1,
-    SV_JSON_INT     = 2,
-    SV_JSON_REAL    = 3,
-    SV_JSON_STRING  = 4,
-    SV_JSON_ARRAY   = 5,
-    SV_JSON_OBJECT  = 6
-  } sv_json_type_e;
+  import sv_serde_pkg::sv_serde_type_e;
+  import sv_serde_pkg::SERDE_NULL;
+  import sv_serde_pkg::SERDE_BOOL;
+  import sv_serde_pkg::SERDE_INT;
+  import sv_serde_pkg::SERDE_REAL;
+  import sv_serde_pkg::SERDE_STRING;
+  import sv_serde_pkg::SERDE_ARRAY;
+  import sv_serde_pkg::SERDE_OBJECT;
+
+  // Backward-compat type alias and constants
+  typedef sv_serde_type_e sv_json_type_e;
+  localparam SV_JSON_NULL    = SERDE_NULL;
+  localparam SV_JSON_BOOLEAN = SERDE_BOOL;
+  localparam SV_JSON_INT     = SERDE_INT;
+  localparam SV_JSON_REAL    = SERDE_REAL;
+  localparam SV_JSON_STRING  = SERDE_STRING;
+  localparam SV_JSON_ARRAY   = SERDE_ARRAY;
+  localparam SV_JSON_OBJECT  = SERDE_OBJECT;
 
   // DPI imports — lifecycle
+  import "DPI-C" function int    dpi_json_parse(input string input_str);
   import "DPI-C" function int    dpi_json_new_object();
   import "DPI-C" function int    dpi_json_new_array();
-  import "DPI-C" function int    dpi_json_parse(input string input_str);
   import "DPI-C" function void   dpi_json_destroy(input int handle);
   import "DPI-C" function int    dpi_json_clone(input int handle);
   import "DPI-C" function void   dpi_json_free(input int handle);
@@ -29,7 +37,7 @@ package sv_json_pkg;
   import "DPI-C" function real   dpi_json_as_real(input int h);
   import "DPI-C" function int    dpi_json_as_bool(input int h);
 
-  // DPI imports — create functions (for from_* factory methods)
+  // DPI imports — create functions
   import "DPI-C" function int    dpi_json_create_string(input string val);
   import "DPI-C" function int    dpi_json_create_int_val(input int val);
   import "DPI-C" function int    dpi_json_create_float_val(input real val);
@@ -65,264 +73,157 @@ package sv_json_pkg;
   import "DPI-C" function int    dpi_json_dump_file(input int h, input string fname, input int indent);
   import "DPI-C" function int    dpi_json_write_file(input int h, input string path, input int indent);
 
-  // Strict mode flag
-  bit strict_mode = 0;
+  // DPI imports — error reporting
+  import "DPI-C" function string dpi_serde_last_error();
 
-  class sv_json;
-    local int m_handle;
-    local sv_json_type_e m_type;
+  `include "sv_serde_base.svh"
 
-    local function new(int handle, sv_json_type_e json_type);
-      m_handle = handle;
-      m_type = json_type;
+  class sv_json extends sv_serde_base;
+
+    function new(int handle, sv_serde_type_e json_type);
+      super.new(handle, json_type);
     endfunction
 
-    // --- Static factory methods ---
+    // --- DPI dispatch virtual overrides (one-liner delegates) ---
+    function int   dpi_parse(string s);           return dpi_json_parse(s);           endfunction
+    function int   dpi_new_object();              return dpi_json_new_object();       endfunction
+    function int   dpi_new_array();               return dpi_json_new_array();        endfunction
+    function int   dpi_create_string(string v);   return dpi_json_create_string(v);   endfunction
+    function int   dpi_create_int_val(int v);     return dpi_json_create_int_val(v);  endfunction
+    function int   dpi_create_float_val(real v);  return dpi_json_create_float_val(v);endfunction
+    function int   dpi_create_bool_val(int v);    return dpi_json_create_bool_val(v); endfunction
+    function int   dpi_create_null();             return dpi_json_create_null();      endfunction
+    function int   dpi_get(int h, string k);      return dpi_json_get(h, k);          endfunction
+    function int   dpi_at(int h, int i);          return dpi_json_at(h, i);           endfunction
+    function int   dpi_at_path(int h, string p);  return dpi_json_at_path(h, p);      endfunction
+    function int   dpi_contains(int h, string k); return dpi_json_contains(h, k);     endfunction
+    function int   dpi_empty(int h);              return dpi_json_empty(h);           endfunction
+    function int   dpi_size(int h);               return dpi_json_size(h);            endfunction
+    function string dpi_key_at(int h, int i);     return dpi_json_key_at(h, i);       endfunction
+    function int    dpi_set(int h, string k, int v);       return dpi_json_set(h, k, v);       endfunction
+    function int    dpi_push(int h, int v);               return dpi_json_push(h, v);          endfunction
+    function int    dpi_insert_at(int h, int i, int v);   return dpi_json_insert_at(h, i, v);  endfunction
+    function int    dpi_remove(int h, string k);          return dpi_json_remove(h, k);        endfunction
+    function int    dpi_remove_at(int h, int i);          return dpi_json_remove_at(h, i);     endfunction
+    function int    dpi_update(int h, int o);             return dpi_json_update(h, o);        endfunction
+    function int    dpi_set_string(int h, string k, string v); return dpi_json_set_string(h, k, v); endfunction
+    function int    dpi_set_int(int h, string k, int v);      return dpi_json_set_int(h, k, v);      endfunction
+    function int    dpi_set_float(int h, string k, real v);   return dpi_json_set_float(h, k, v);    endfunction
+    function int    dpi_set_bool(int h, string k, int v);     return dpi_json_set_bool(h, k, v);     endfunction
+    function int    dpi_set_null(int h, string k);            return dpi_json_set_null(h, k);        endfunction
+    function string dpi_as_string(int h);     return dpi_json_as_string(h);     endfunction
+    function int    dpi_as_int(int h);         return dpi_json_as_int(h);       endfunction
+    function real   dpi_as_real(int h);        return dpi_json_as_real(h);      endfunction
+    function int    dpi_as_bool(int h);        return dpi_json_as_bool(h);      endfunction
+    function string dpi_dump(int h, int i);    return dpi_json_dump(h, i);      endfunction
+    function int    dpi_dump_file(int h, string f, int i); return dpi_json_dump_file(h, f, i); endfunction
+    function int    dpi_clone(int h);          return dpi_json_clone(h);        endfunction
+    function void   dpi_destroy(int h);        dpi_json_destroy(h);            endfunction
+    function int    dpi_is_valid(int h);       return dpi_json_is_valid(h);    endfunction
+    function string dpi_last_error();          return dpi_serde_last_error();  endfunction
+    function int    dpi_get_type(int h);        return dpi_json_get_type(h);   endfunction
 
-    static function sv_json parse(string input_str);
-      int h = dpi_json_parse(input_str);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+    // --- Factory method ---
+    function sv_serde_base make_child(int h, sv_serde_type_e t);
+      sv_json child = new(h, t);
+      child.m_strict_mode = this.m_strict_mode;
+      return child;
     endfunction
 
-    static function sv_json new_object();
-      sv_json tmp = new(dpi_json_new_object(), SV_JSON_OBJECT);
-      return tmp;
-    endfunction
-
-    static function sv_json new_array();
-      sv_json tmp = new(dpi_json_new_array(), SV_JSON_ARRAY);
-      return tmp;
-    endfunction
-
-    static function sv_json from_string(string val);
-      sv_json tmp = new(dpi_json_create_string(val), SV_JSON_STRING);
-      return tmp;
-    endfunction
-
-    static function sv_json from_int(int val);
-      sv_json tmp = new(dpi_json_create_int_val(val), SV_JSON_INT);
-      return tmp;
-    endfunction
-
-    static function sv_json from_real(real val);
-      sv_json tmp = new(dpi_json_create_float_val(val), SV_JSON_REAL);
-      return tmp;
-    endfunction
-
-    static function sv_json from_bool(bit val);
-      sv_json tmp = new(dpi_json_create_bool_val(val ? 1 : 0), SV_JSON_BOOLEAN);
-      return tmp;
-    endfunction
-
-    static function sv_json make_null();
-      sv_json tmp = new(dpi_json_create_null(), SV_JSON_NULL);
-      return tmp;
-    endfunction
-
-    static function void set_strict_mode(bit enable);
-      strict_mode = enable;
-    endfunction
-
-    // --- Type checking (uses cached m_type) ---
-
-    function bit is_null();    return m_type == SV_JSON_NULL;    endfunction
-    function bit is_boolean(); return m_type == SV_JSON_BOOLEAN; endfunction
-    function bit is_int();     return m_type == SV_JSON_INT;     endfunction
-    function bit is_real();    return m_type == SV_JSON_REAL;    endfunction
-    function bit is_string();  return m_type == SV_JSON_STRING;  endfunction
-    function bit is_array();   return m_type == SV_JSON_ARRAY;   endfunction
-    function bit is_object();  return m_type == SV_JSON_OBJECT;  endfunction
-
-    function bit is_number();
-      return is_int() || is_real();
-    endfunction
-
-    function sv_json_type_e get_type();
-      return m_type;
-    endfunction
-
-    // --- Value extraction ---
-
-    function string as_string();
-      if (strict_mode && !is_string()) $fatal(1, "Not a string");
-      return dpi_json_as_string(m_handle);
-    endfunction
-
-    function int as_int();
-      if (strict_mode && !is_int()) $fatal(1, "Not an int");
-      return dpi_json_as_int(m_handle);
-    endfunction
-
-    function real as_real();
-      if (strict_mode && !is_real()) $fatal(1, "Not a real");
-      return dpi_json_as_real(m_handle);
-    endfunction
-
-    function bit as_bool();
-      if (strict_mode && !is_boolean()) $fatal(1, "Not a boolean");
-      return dpi_json_as_bool(m_handle);
-    endfunction
-
-    function string value_string(string key, string default_val);
-      sv_json v = get(key);
-      if (v == null) return default_val;
-      if (!v.is_string()) return default_val;
-      return v.as_string();
-    endfunction
-
-    function int value_int(string key, int default_val);
-      sv_json v = get(key);
-      if (v == null) return default_val;
-      if (!v.is_int()) return default_val;
-      return v.as_int();
-    endfunction
-
-    function real value_real(string key, real default_val);
-      sv_json v = get(key);
-      if (v == null) return default_val;
-      if (!v.is_real()) return default_val;
-      return v.as_real();
-    endfunction
-
-    function bit value_bool(string key, bit default_val);
-      sv_json v = get(key);
-      if (v == null) return default_val;
-      if (!v.is_boolean()) return default_val;
-      return v.as_bool();
-    endfunction
-
-    // --- Structure access ---
-
+    // --- Public accessors (shadow base _xxx methods with correct return type) ---
     function sv_json get(string key);
-      int h = dpi_json_get(m_handle, key);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._get(key);
+      if (v == null) return null;
+      $cast(get, v);
     endfunction
 
     function sv_json at(int idx);
-      int h = dpi_json_at(m_handle, idx);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._at(idx);
+      if (v == null) return null;
+      $cast(at, v);
     endfunction
 
     function sv_json at_path(string path);
-      int h = dpi_json_at_path(m_handle, path);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._at_path(path);
+      if (v == null) return null;
+      $cast(at_path, v);
     endfunction
-
-    function bit contains(string key);
-      return dpi_json_contains(m_handle, key);
-    endfunction
-
-    function bit empty();
-      return dpi_json_empty(m_handle);
-    endfunction
-
-    function int size();
-      return dpi_json_size(m_handle);
-    endfunction
-
-    function string key_at(int idx);
-      return dpi_json_key_at(m_handle, idx);
-    endfunction
-
-    function void get_keys(output string keys[$]);
-      int n;
-      keys = {};
-      if (!is_object()) return;
-      n = size();
-      for (int i = 0; i < n; i++) begin
-        keys.push_back(key_at(i));
-      end
-    endfunction
-
-    // --- Modification (immutable) ---
 
     function sv_json set(string key, sv_json value);
-      int h = dpi_json_set(m_handle, key, value.m_handle);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._set(key, value);
+      if (v == null) return null;
+      $cast(set, v);
     endfunction
 
     function sv_json push(sv_json value);
-      int h = dpi_json_push(m_handle, value.m_handle);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._push(value);
+      if (v == null) return null;
+      $cast(push, v);
     endfunction
 
     function sv_json insert_at(int idx, sv_json value);
-      int h = dpi_json_insert_at(m_handle, idx, value.m_handle);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._insert_at(idx, value);
+      if (v == null) return null;
+      $cast(insert_at, v);
     endfunction
 
     function sv_json remove(string key);
-      int h = dpi_json_remove(m_handle, key);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._remove(key);
+      if (v == null) return null;
+      $cast(remove, v);
     endfunction
 
     function sv_json remove_at(int idx);
-      int h = dpi_json_remove_at(m_handle, idx);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._remove_at(idx);
+      if (v == null) return null;
+      $cast(remove_at, v);
     endfunction
 
     function sv_json update(sv_json other);
-      int h = dpi_json_update(m_handle, other.m_handle);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._update(other);
+      if (v == null) return null;
+      $cast(update, v);
     endfunction
-
-    // --- Serialization ---
-
-    function string dump(string fname = "", int indent = 2);
-      if (fname != "") begin
-        int rc = dpi_json_dump_file(m_handle, fname, indent);
-        return (rc == 0) ? "ok" : "error";
-      end
-      return dpi_json_dump(m_handle, indent);
-    endfunction
-
-    // Alias for dump with file
-    function int dump_file(string fname, int indent = 2);
-      return dpi_json_dump_file(m_handle, fname, indent);
-    endfunction
-
-    // --- Lifecycle ---
 
     function sv_json clone();
-      int h = dpi_json_clone(m_handle);
-      sv_json tmp;
-      if (h == 0) return null;
-      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
-      return tmp;
+      sv_serde_base v = super._clone();
+      if (v == null) return null;
+      $cast(clone, v);
     endfunction
 
-    function bit is_valid();
-      return dpi_json_is_valid(m_handle);
+    // --- Static factory methods ---
+    static function sv_json parse(string input_str);
+      int h = dpi_json_parse(input_str);
+      if (h == 0) return null;
+      return new(h, sv_serde_type_e'(dpi_json_get_type(h)));
+    endfunction
+
+    static function sv_json new_object();
+      return new(dpi_json_new_object(), SERDE_OBJECT);
+    endfunction
+
+    static function sv_json new_array();
+      return new(dpi_json_new_array(), SERDE_ARRAY);
+    endfunction
+
+    static function sv_json from_string(string val);
+      return new(dpi_json_create_string(val), SERDE_STRING);
+    endfunction
+
+    static function sv_json from_int(int val);
+      return new(dpi_json_create_int_val(val), SERDE_INT);
+    endfunction
+
+    static function sv_json from_real(real val);
+      return new(dpi_json_create_float_val(val), SERDE_REAL);
+    endfunction
+
+    static function sv_json from_bool(bit val);
+      return new(dpi_json_create_bool_val(val ? 1 : 0), SERDE_BOOL);
+    endfunction
+
+    static function sv_json make_null();
+      return new(dpi_json_create_null(), SERDE_NULL);
     endfunction
 
   endclass
