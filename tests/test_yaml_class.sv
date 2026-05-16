@@ -1,9 +1,8 @@
 module test_yaml_class;
   import sv_yaml_pkg::*;
-`include "serde_test_helpers.sv"
-
   int pass_count = 0;
   int fail_count = 0;
+`include "serde_test_helpers.sv"
 
   initial begin
     sv_yaml y, y2, arr;

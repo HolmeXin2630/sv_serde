@@ -1,9 +1,8 @@
-import sv_json_pkg::*;
-`include "serde_test_helpers.sv"
-
 module test_json_class;
+  import sv_json_pkg::*;
   int pass_count = 0;
   int fail_count = 0;
+`include "serde_test_helpers.sv"
   sv_json j, j2;
 
   initial begin
