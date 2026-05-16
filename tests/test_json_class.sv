@@ -13,8 +13,32 @@ module test_json_class;
     check_string("get name", j.get("name").as_string(), "Alice");
     check_int("get age", j.get("age").as_int(), 30);
     check_bit("get missing", (j.get("missing") == null), 1);
+    // at_path
     j2 = sv_json::parse("{\"x\":{\"y\":42}}");
     check_int("at_path /x/y", j2.at_path("/x/y").as_int(), 42);
+    // at_path — root keys
+    j = sv_json::parse("{\"name\":\"Alice\",\"age\":30}");
+    check_string("at_path /name", j.at_path("/name").as_string(), "Alice");
+    check_int("at_path /age", j.at_path("/age").as_int(), 30);
+    check_bit("at_path /missing", (j.at_path("/missing") == null), 1);
+    // at_path — array index
+    j = sv_json::parse("[10, 20, 30]");
+    check_int("at_path /0", j.at_path("/0").as_int(), 10);
+    check_int("at_path /1", j.at_path("/1").as_int(), 20);
+    check_int("at_path /2", j.at_path("/2").as_int(), 30);
+    check_bit("at_path /99", (j.at_path("/99") == null), 1);
+    // at_path — mixed array + object
+    j = sv_json::parse("{\"items\":[{\"name\":\"a\"},{\"name\":\"b\"}]}");
+    check_string("at_path /items/0/name", j.at_path("/items/0/name").as_string(), "a");
+    check_string("at_path /items/1/name", j.at_path("/items/1/name").as_string(), "b");
+    check_bit("at_path /items/0/missing", (j.at_path("/items/0/missing") == null), 1);
+    // at_path — object with array child
+    j = sv_json::parse("{\"a\":[1,2,3]}");
+    check_int("at_path /a/0", j.at_path("/a/0").as_int(), 1);
+    check_int("at_path /a/2", j.at_path("/a/2").as_int(), 3);
+    // at_path — deep nesting
+    j = sv_json::parse("{\"a\":{\"b\":{\"c\":{\"d\":42}}}}");
+    check_int("at_path /a/b/c/d", j.at_path("/a/b/c/d").as_int(), 42);
     j = sv_json::from_int(99);
     check_int("from_int", j.as_int(), 99);
     j = sv_json::from_string("hello");

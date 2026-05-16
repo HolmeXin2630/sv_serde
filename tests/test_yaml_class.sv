@@ -26,6 +26,29 @@ module test_yaml_class;
     // at_path
     y2 = sv_yaml::parse("x:\n  y: 42");
     check_int("at_path /x/y", y2.at_path("/x/y").as_int(), 42);
+    // at_path — root keys
+    y = sv_yaml::parse("name: Alice\nage: 30");
+    check_string("at_path /name", y.at_path("/name").as_string(), "Alice");
+    check_int("at_path /age", y.at_path("/age").as_int(), 30);
+    check_bit("at_path /missing", (y.at_path("/missing") == null), 1);
+    // at_path — array index
+    y = sv_yaml::parse("[10, 20, 30]");
+    check_int("at_path /0", y.at_path("/0").as_int(), 10);
+    check_int("at_path /1", y.at_path("/1").as_int(), 20);
+    check_int("at_path /2", y.at_path("/2").as_int(), 30);
+    check_bit("at_path /99", (y.at_path("/99") == null), 1);
+    // at_path — mixed array + object
+    y = sv_yaml::parse("items:\n  - name: a\n  - name: b");
+    check_string("at_path /items/0/name", y.at_path("/items/0/name").as_string(), "a");
+    check_string("at_path /items/1/name", y.at_path("/items/1/name").as_string(), "b");
+    check_bit("at_path /items/0/missing", (y.at_path("/items/0/missing") == null), 1);
+    // at_path — object with array child
+    y = sv_yaml::parse("a:\n  - 1\n  - 2\n  - 3");
+    check_int("at_path /a/0", y.at_path("/a/0").as_int(), 1);
+    check_int("at_path /a/2", y.at_path("/a/2").as_int(), 3);
+    // at_path — deep nesting
+    y = sv_yaml::parse("a:\n  b:\n    c:\n      d: 42");
+    check_int("at_path /a/b/c/d", y.at_path("/a/b/c/d").as_int(), 42);
 
     // factory
     y = sv_yaml::from_int(99);
