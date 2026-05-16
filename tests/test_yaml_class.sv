@@ -1,38 +1,9 @@
 module test_yaml_class;
   import sv_yaml_pkg::*;
+`include "serde_test_helpers.sv"
 
   int pass_count = 0;
   int fail_count = 0;
-
-  task check_int(string name, int actual, int expected);
-    if (actual === expected) begin
-      $display("[PASS] %s: got %0d", name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected %0d, got %0d", name, expected, actual);
-      fail_count++;
-    end
-  endtask
-
-  task check_string(string name, string actual, string expected);
-    if (actual == expected) begin
-      $display("[PASS] %s: got '%s'", name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected '%s', got '%s'", name, expected, actual);
-      fail_count++;
-    end
-  endtask
-
-  task check_bit(string name, bit actual, bit expected);
-    if (actual === expected) begin
-      $display("[PASS] %s: got %0d", name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected %0d, got %0d", name, expected, actual);
-      fail_count++;
-    end
-  endtask
 
   initial begin
     sv_yaml y, y2, arr;

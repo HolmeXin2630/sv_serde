@@ -1,39 +1,10 @@
 import sv_json_pkg::*;
+`include "serde_test_helpers.sv"
 
 module test_json_class;
   int pass_count = 0;
   int fail_count = 0;
   sv_json j, j2;
-
-  task check_int(string name, int actual, int expected);
-    if (actual === expected) begin
-      $display("[PASS] %s: got %0d", name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected %0d, got %0d", name, expected, actual);
-      fail_count++;
-    end
-  endtask
-
-  task check_string(string name, string actual, string expected);
-    if (actual == expected) begin
-      $display("[PASS] %s: got '%s'", name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected '%s', got '%s'", name, expected, actual);
-      fail_count++;
-    end
-  endtask
-
-  task check_bit(string name, bit actual, bit expected);
-    if (actual === expected) begin
-      $display("[PASS] %s: got %0d", name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected %0d, got %0d", name, expected, actual);
-      fail_count++;
-    end
-  endtask
 
   initial begin
     j = sv_json::parse("{\"name\":\"Alice\",\"age\":30}");

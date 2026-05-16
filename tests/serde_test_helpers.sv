@@ -41,3 +41,8 @@ task automatic check_real(string test_name, real actual, real expected);
     fail_count++;
   end
 endtask
+
+// Alias for backward-compat with legacy test code
+task automatic check_string(string test_name, string actual, string expected);
+  check(test_name, actual, expected);
+endtask
