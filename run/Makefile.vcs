@@ -1,0 +1,56 @@
+VCS ?= vcs
+VCS_FLAGS = -sverilog -cpp g++ -full64 -timescale=1ns/1ps \
+	+incdir+$(abspath tests) \
+	+incdir+$(abspath sv_serde/src)
+
+JSON_CFLAGS = -std=c++14 -I$(abspath sv_json/src/dpi) -I$(abspath sv_serde/src/dpi)
+YAML_CFLAGS = -std=c++14 -I$(abspath sv_yaml/src/dpi) -I$(abspath sv_serde/src/dpi)
+
+SERDE_PKG = sv_serde/src/sv_serde_pkg.sv
+SERDE_DPI = sv_serde/src/dpi/serde_common.cc
+
+JSON_PKG = sv_json/src/sv_json_pkg.sv
+JSON_DPI = sv_json/src/dpi/sv_json_dpi.cc
+JSON_TEST = tests/test_json_class.sv
+JSON_TOP = test_json_class
+JSON_BIN = simv_json
+
+YAML_PKG = sv_yaml/src/sv_yaml_pkg.sv
+YAML_DPI = sv_yaml/src/dpi/sv_yaml_dpi.cc
+YAML_TEST = tests/test_yaml_class.sv
+YAML_TOP = test_yaml_class
+YAML_BIN = simv_yaml
+
+.PHONY: run_test_json run_test_yaml run_test_all clean
+
+run_test_json:
+	$(VCS) $(VCS_FLAGS) -CFLAGS "$(JSON_CFLAGS)" \
+		$(SERDE_PKG) \
+		$(JSON_PKG) \
+		$(JSON_TEST) \
+		$(JSON_DPI) \
+		$(SERDE_DPI) \
+		-top $(JSON_TOP) \
+		-o $(JSON_BIN) \
+		-l vcs_json.log
+	./$(JSON_BIN)
+
+run_test_yaml:
+	$(VCS) $(VCS_FLAGS) -CFLAGS "$(YAML_CFLAGS)" \
+		$(SERDE_PKG) \
+		$(YAML_PKG) \
+		$(YAML_TEST) \
+		$(YAML_DPI) \
+		$(SERDE_DPI) \
+		-top $(YAML_TOP) \
+		-o $(YAML_BIN) \
+		-l vcs_yaml.log
+	./$(YAML_BIN)
+
+run_test_all:
+	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) run_test_json
+	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) run_test_yaml
+	@echo "All tests passed!"
+
+clean:
+	rm -rf simv* csrc/ vc_hdrs.h ucli.key vcs_*.log *.daidir/ DVEfiles/ AN.DB/ inter.vpd
