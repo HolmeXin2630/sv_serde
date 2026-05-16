@@ -80,6 +80,8 @@ package sv_json_pkg;
 
   class sv_json extends sv_serde_base;
 
+    static protected sv_json s_tmp;
+
     function new();
       super.new();
     endfunction
@@ -201,59 +203,51 @@ package sv_json_pkg;
     static function sv_json parse(string input_str);
       int h = dpi_json_parse(input_str);
       if (h == 0) return null;
-      sv_json result;
-      result = new();
-      result.init(h, sv_serde_type_e'(dpi_json_get_type(h)));
-      return result;
+      s_tmp = new();
+      s_tmp.init(h, sv_serde_type_e'(dpi_json_get_type(h)));
+      return s_tmp;
     endfunction
 
     static function sv_json new_object();
-      sv_json result;
-      result = new();
-      result.init(dpi_json_new_object(), SERDE_OBJECT);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_json_new_object(), SERDE_OBJECT);
+      return s_tmp;
     endfunction
 
     static function sv_json new_array();
-      sv_json result;
-      result = new();
-      result.init(dpi_json_new_array(), SERDE_ARRAY);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_json_new_array(), SERDE_ARRAY);
+      return s_tmp;
     endfunction
 
     static function sv_json from_string(string val);
-      sv_json result;
-      result = new();
-      result.init(dpi_json_create_string(val), SERDE_STRING);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_json_create_string(val), SERDE_STRING);
+      return s_tmp;
     endfunction
 
     static function sv_json from_int(int val);
-      sv_json result;
-      result = new();
-      result.init(dpi_json_create_int_val(val), SERDE_INT);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_json_create_int_val(val), SERDE_INT);
+      return s_tmp;
     endfunction
 
     static function sv_json from_real(real val);
-      sv_json result;
-      result = new();
-      result.init(dpi_json_create_float_val(val), SERDE_REAL);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_json_create_float_val(val), SERDE_REAL);
+      return s_tmp;
     endfunction
 
     static function sv_json from_bool(bit val);
-      sv_json result;
-      result = new();
-      result.init(dpi_json_create_bool_val(val ? 1 : 0), SERDE_BOOL);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_json_create_bool_val(val ? 1 : 0), SERDE_BOOL);
+      return s_tmp;
     endfunction
 
     static function sv_json make_null();
-      sv_json result;
-      result = new();
-      result.init(dpi_json_create_null(), SERDE_NULL);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_json_create_null(), SERDE_NULL);
+      return s_tmp;
     endfunction
 
   endclass

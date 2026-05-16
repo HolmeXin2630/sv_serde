@@ -92,6 +92,8 @@ package sv_yaml_pkg;
 
   class sv_yaml extends sv_serde_base;
 
+    static protected sv_yaml s_tmp;
+
     function new();
       super.new();
     endfunction
@@ -213,59 +215,51 @@ package sv_yaml_pkg;
     static function sv_yaml parse(string input_str);
       int h = dpi_yaml_parse(input_str);
       if (h == 0) return null;
-      sv_yaml result;
-      result = new();
-      result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
-      return result;
+      s_tmp = new();
+      s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      return s_tmp;
     endfunction
 
     static function sv_yaml new_object();
-      sv_yaml result;
-      result = new();
-      result.init(dpi_yaml_new_object(), SERDE_OBJECT);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_yaml_new_object(), SERDE_OBJECT);
+      return s_tmp;
     endfunction
 
     static function sv_yaml new_array();
-      sv_yaml result;
-      result = new();
-      result.init(dpi_yaml_new_array(), SERDE_ARRAY);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_yaml_new_array(), SERDE_ARRAY);
+      return s_tmp;
     endfunction
 
     static function sv_yaml from_string(string val);
-      sv_yaml result;
-      result = new();
-      result.init(dpi_yaml_create_string(val), SERDE_STRING);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_yaml_create_string(val), SERDE_STRING);
+      return s_tmp;
     endfunction
 
     static function sv_yaml from_int(int val);
-      sv_yaml result;
-      result = new();
-      result.init(dpi_yaml_create_int_val(val), SERDE_INT);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_yaml_create_int_val(val), SERDE_INT);
+      return s_tmp;
     endfunction
 
     static function sv_yaml from_real(real val);
-      sv_yaml result;
-      result = new();
-      result.init(dpi_yaml_create_float_val(val), SERDE_REAL);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_yaml_create_float_val(val), SERDE_REAL);
+      return s_tmp;
     endfunction
 
     static function sv_yaml from_bool(bit val);
-      sv_yaml result;
-      result = new();
-      result.init(dpi_yaml_create_bool_val(val ? 1 : 0), SERDE_BOOL);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_yaml_create_bool_val(val ? 1 : 0), SERDE_BOOL);
+      return s_tmp;
     endfunction
 
     static function sv_yaml make_null();
-      sv_yaml result;
-      result = new();
-      result.init(dpi_yaml_create_null(), SERDE_NULL);
-      return result;
+      s_tmp = new();
+      s_tmp.init(dpi_yaml_create_null(), SERDE_NULL);
+      return s_tmp;
     endfunction
 
     // --- YAML-specific methods ---
@@ -274,8 +268,8 @@ package sv_yaml_pkg;
       if (h == 0) return null;
       sv_yaml result;
       result = new();
-      result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
-      return result;
+      s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      return s_tmp;
     endfunction
 
     function string yaml_comments();
@@ -287,8 +281,8 @@ package sv_yaml_pkg;
       if (h == 0) return null;
       sv_yaml result;
       result = new();
-      result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
-      return result;
+      s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      return s_tmp;
     endfunction
 
     function string yaml_anchor();
@@ -300,8 +294,8 @@ package sv_yaml_pkg;
       if (h == 0) return null;
       sv_yaml result;
       result = new();
-      result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
-      return result;
+      s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      return s_tmp;
     endfunction
 
     function string yaml_alias();
@@ -317,8 +311,8 @@ package sv_yaml_pkg;
       if (h == 0) return null;
       sv_yaml result;
       result = new();
-      result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
-      return result;
+      s_tmp.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      return s_tmp;
     endfunction
 
     function string yaml_dump_flow();
