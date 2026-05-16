@@ -30,3 +30,7 @@ waves.shm/
 *.dylib
 *.log
 *.key
+
+# Test output
+sv_json/tests/data/out_*.json
+sv_yaml/tests/data/out_*.yaml
