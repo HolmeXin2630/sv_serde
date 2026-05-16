@@ -129,7 +129,8 @@ package sv_json_pkg;
 
     // --- Factory method ---
     function sv_serde_base make_child(int h, sv_serde_type_e t);
-      sv_json child = new();
+      sv_json child;
+      child = new();
       child.init(h, t);
       child.m_strict_mode = this.m_strict_mode;
       return child;
@@ -200,49 +201,57 @@ package sv_json_pkg;
     static function sv_json parse(string input_str);
       int h = dpi_json_parse(input_str);
       if (h == 0) return null;
-      sv_json result = new();
+      sv_json result;
+      result = new();
       result.init(h, sv_serde_type_e'(dpi_json_get_type(h)));
       return result;
     endfunction
 
     static function sv_json new_object();
-      sv_json result = new();
+      sv_json result;
+      result = new();
       result.init(dpi_json_new_object(), SERDE_OBJECT);
       return result;
     endfunction
 
     static function sv_json new_array();
-      sv_json result = new();
+      sv_json result;
+      result = new();
       result.init(dpi_json_new_array(), SERDE_ARRAY);
       return result;
     endfunction
 
     static function sv_json from_string(string val);
-      sv_json result = new();
+      sv_json result;
+      result = new();
       result.init(dpi_json_create_string(val), SERDE_STRING);
       return result;
     endfunction
 
     static function sv_json from_int(int val);
-      sv_json result = new();
+      sv_json result;
+      result = new();
       result.init(dpi_json_create_int_val(val), SERDE_INT);
       return result;
     endfunction
 
     static function sv_json from_real(real val);
-      sv_json result = new();
+      sv_json result;
+      result = new();
       result.init(dpi_json_create_float_val(val), SERDE_REAL);
       return result;
     endfunction
 
     static function sv_json from_bool(bit val);
-      sv_json result = new();
+      sv_json result;
+      result = new();
       result.init(dpi_json_create_bool_val(val ? 1 : 0), SERDE_BOOL);
       return result;
     endfunction
 
     static function sv_json make_null();
-      sv_json result = new();
+      sv_json result;
+      result = new();
       result.init(dpi_json_create_null(), SERDE_NULL);
       return result;
     endfunction

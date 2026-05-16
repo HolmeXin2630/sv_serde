@@ -141,7 +141,8 @@ package sv_yaml_pkg;
 
     // --- Factory method ---
     function sv_serde_base make_child(int h, sv_serde_type_e t);
-      sv_yaml child = new();
+      sv_yaml child;
+      child = new();
       child.init(h, t);
       child.m_strict_mode = this.m_strict_mode;
       return child;
@@ -212,49 +213,57 @@ package sv_yaml_pkg;
     static function sv_yaml parse(string input_str);
       int h = dpi_yaml_parse(input_str);
       if (h == 0) return null;
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return result;
     endfunction
 
     static function sv_yaml new_object();
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(dpi_yaml_new_object(), SERDE_OBJECT);
       return result;
     endfunction
 
     static function sv_yaml new_array();
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(dpi_yaml_new_array(), SERDE_ARRAY);
       return result;
     endfunction
 
     static function sv_yaml from_string(string val);
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(dpi_yaml_create_string(val), SERDE_STRING);
       return result;
     endfunction
 
     static function sv_yaml from_int(int val);
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(dpi_yaml_create_int_val(val), SERDE_INT);
       return result;
     endfunction
 
     static function sv_yaml from_real(real val);
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(dpi_yaml_create_float_val(val), SERDE_REAL);
       return result;
     endfunction
 
     static function sv_yaml from_bool(bit val);
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(dpi_yaml_create_bool_val(val ? 1 : 0), SERDE_BOOL);
       return result;
     endfunction
 
     static function sv_yaml make_null();
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(dpi_yaml_create_null(), SERDE_NULL);
       return result;
     endfunction
@@ -263,7 +272,8 @@ package sv_yaml_pkg;
     static function sv_yaml yaml_parse_all(string input_str);
       int h = dpi_yaml_parse_all(input_str);
       if (h == 0) return null;
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return result;
     endfunction
@@ -275,7 +285,8 @@ package sv_yaml_pkg;
     function sv_yaml yaml_set_comment(string text);
       int h = dpi_yaml_set_comment(m_handle, text);
       if (h == 0) return null;
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return result;
     endfunction
@@ -287,7 +298,8 @@ package sv_yaml_pkg;
     function sv_yaml yaml_set_anchor(string name);
       int h = dpi_yaml_set_anchor(m_handle, name);
       if (h == 0) return null;
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return result;
     endfunction
@@ -303,7 +315,8 @@ package sv_yaml_pkg;
     function sv_yaml yaml_set_tag(string tag);
       int h = dpi_yaml_set_tag(m_handle, tag);
       if (h == 0) return null;
-      sv_yaml result = new();
+      sv_yaml result;
+      result = new();
       result.init(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
       return result;
     endfunction
