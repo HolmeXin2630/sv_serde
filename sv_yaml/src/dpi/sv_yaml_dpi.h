@@ -81,6 +81,9 @@ int dpi_yaml_set_tag(int h, const char* tag);
 const char* dpi_yaml_dump_flow(int h);
 const char* dpi_yaml_dump_with_comments(int h);
 
+	// Error reporting
+	const char* dpi_serde_last_error(void);
+
 #ifdef __cplusplus
 }
 #endif
