@@ -1,5 +1,5 @@
 VERILATOR ?= verilator
-VERILATOR_FLAGS = --binary --build -Wno-WIDTH -Wno-CASEINCOMPLETE -Wno-UNOPTFLAT -Wno-UNUSED -Wno-BLKANDNBLK -Wno-STMTDLY -Wno-INITIALDLY -Wno-IMPLICIT -Wno-DECLFILENAME -Wno-WIDTHTRUNC -I$(abspath tests)
+VERILATOR_FLAGS = --binary --build -Wno-WIDTH -Wno-CASEINCOMPLETE -Wno-UNOPTFLAT -Wno-UNUSED -Wno-BLKANDNBLK -Wno-STMTDLY -Wno-INITIALDLY -Wno-IMPLICIT -Wno-DECLFILENAME -Wno-WIDTHTRUNC -I$(abspath tests) -I$(abspath sv_serde/src)
 
 JSON_CFLAGS = -std=c++14 -I$(abspath sv_json/src/dpi) -I$(abspath sv_serde/src/dpi)
 YAML_CFLAGS = -std=c++14 -I$(abspath sv_yaml/src/dpi) -I$(abspath sv_serde/src/dpi)
@@ -20,6 +20,7 @@ YAML_OBJ_DIR = obj_dir_yaml_class
 
 run_test_json:
 	$(VERILATOR) $(VERILATOR_FLAGS) -CFLAGS "$(JSON_CFLAGS)" \
+		sv_serde/src/sv_serde_pkg.sv \
 		$(JSON_PKG) \
 		$(JSON_TEST) \
 		$(JSON_DPI) \
@@ -30,6 +31,7 @@ run_test_json:
 
 run_test_yaml:
 	$(VERILATOR) $(VERILATOR_FLAGS) -CFLAGS "$(YAML_CFLAGS)" \
+		sv_serde/src/sv_serde_pkg.sv \
 		$(YAML_PKG) \
 		$(YAML_TEST) \
 		$(YAML_DPI) \
