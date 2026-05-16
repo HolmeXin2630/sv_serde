@@ -1,5 +1,5 @@
 VCS ?= vcs
-VCS_FLAGS = -sverilog -cpp g++ -full64 -timescale=1ns/1ps \
+VCS_FLAGS = -sverilog -full64 \
 	+incdir+$(abspath tests) \
 	+incdir+$(abspath sv_serde/src)
 
