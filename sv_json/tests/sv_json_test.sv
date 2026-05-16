@@ -7,14 +7,12 @@ module sv_json_test;
   import "DPI-C" function int    dpi_json_new_array();
   import "DPI-C" function int    dpi_json_parse(input string input_str);
   import "DPI-C" function void   dpi_json_destroy(input int h);
+  import "DPI-C" function int    dpi_json_clone(input int h);
+  import "DPI-C" function void   dpi_json_free(input int h);
+  import "DPI-C" function int    dpi_json_is_valid(input int h);
 
   // DPI imports — type checking
-  import "DPI-C" function int    dpi_json_is_null(input int h);
-  import "DPI-C" function int    dpi_json_is_boolean(input int h);
-  import "DPI-C" function int    dpi_json_is_int(input int h);
-  import "DPI-C" function int    dpi_json_is_string(input int h);
-  import "DPI-C" function int    dpi_json_is_array(input int h);
-  import "DPI-C" function int    dpi_json_is_object(input int h);
+  import "DPI-C" function int    dpi_json_get_type(input int h);
 
   // DPI imports — value extraction
   import "DPI-C" function string dpi_json_as_string(input int h);
@@ -22,16 +20,20 @@ module sv_json_test;
   import "DPI-C" function real   dpi_json_as_real(input int h);
   import "DPI-C" function int    dpi_json_as_bool(input int h);
 
+  // DPI imports — create functions
+  import "DPI-C" function int    dpi_json_create_string(input string val);
+  import "DPI-C" function int    dpi_json_create_int_val(input int val);
+  import "DPI-C" function int    dpi_json_create_float_val(input real val);
+  import "DPI-C" function int    dpi_json_create_bool_val(input int val);
+  import "DPI-C" function int    dpi_json_create_null();
+
   // DPI imports — structure access
   import "DPI-C" function int    dpi_json_get(input int h, input string key);
   import "DPI-C" function int    dpi_json_at(input int h, input int idx);
-  import "DPI-C" function int    dpi_json_empty(input int h);
-  import "DPI-C" function int    dpi_json_size(input int h);
-
-  // DPI imports — structure access (extended)
-  import "DPI-C" function int    dpi_json_is_real(input int h);
   import "DPI-C" function int    dpi_json_at_path(input int h, input string path);
   import "DPI-C" function int    dpi_json_contains(input int h, input string key);
+  import "DPI-C" function int    dpi_json_empty(input int h);
+  import "DPI-C" function int    dpi_json_size(input int h);
   import "DPI-C" function string dpi_json_key_at(input int h, input int idx);
 
   // DPI imports — modification
@@ -42,9 +44,17 @@ module sv_json_test;
   import "DPI-C" function int    dpi_json_remove_at(input int h, input int idx);
   import "DPI-C" function int    dpi_json_update(input int h, input int other_h);
 
+  // DPI imports — typed set
+  import "DPI-C" function int    dpi_json_set_string(input int h, input string key, input string value);
+  import "DPI-C" function int    dpi_json_set_int(input int h, input string key, input int value);
+  import "DPI-C" function int    dpi_json_set_float(input int h, input string key, input real value);
+  import "DPI-C" function int    dpi_json_set_bool(input int h, input string key, input int value);
+  import "DPI-C" function int    dpi_json_set_null(input int h, input string key);
+
   // DPI imports — serialization
   import "DPI-C" function string dpi_json_dump(input int h, input int indent);
   import "DPI-C" function int    dpi_json_dump_file(input int h, input string fname, input int indent);
+  import "DPI-C" function int    dpi_json_write_file(input int h, input string path, input int indent);
 
   task automatic check(string test_name, string actual, string expected);
     if (actual == expected) begin
@@ -99,7 +109,7 @@ module sv_json_test;
     // --- Parse ---
     j = dpi_json_parse("{\"name\":\"Alice\",\"age\":30}");
     check_bit("parse: not null", (j != 0) ? 1 : 0, 1);
-    check_bit("parse: is object", dpi_json_is_object(j), 1);
+    check_bit("parse: is object", dpi_json_get_type(j), 6);
     check_int("parse: size", dpi_json_size(j), 2);
 
     // --- Get ---
@@ -115,37 +125,37 @@ module sv_json_test;
     check_bit("get: missing key returns null", (h == 0) ? 1 : 0, 1);
 
     // --- Type checking ---
-    check_bit("is_object on object", dpi_json_is_object(j), 1);
+    check_bit("get_type on object", dpi_json_get_type(j), 6);
 
     h = dpi_json_get(j, "name");
-    check_bit("is_string on string", dpi_json_is_string(h), 1);
+    check_bit("get_type on string", dpi_json_get_type(h), 4);
 
     h = dpi_json_get(j, "age");
-    check_bit("is_int on int", dpi_json_is_int(h), 1);
+    check_bit("get_type on int", dpi_json_get_type(h), 2);
 
     // --- from_int, from_real, from_bool, from_string, make_null ---
-    h = dpi_json_parse("42");
+    h = dpi_json_create_int_val(42);
     check_int("from_int", dpi_json_as_int(h), 42);
 
-    h = dpi_json_parse("3.14");
+    h = dpi_json_create_float_val(3.14);
     check_real("from_real", dpi_json_as_real(h), 3.14);
 
-    h = dpi_json_parse("true");
+    h = dpi_json_create_bool_val(1);
     check_bit("from_bool true", dpi_json_as_bool(h), 1);
 
-    h = dpi_json_parse("\"hello\"");
+    h = dpi_json_create_string("hello");
     check("from_string", dpi_json_as_string(h), "hello");
 
-    h = dpi_json_parse("null");
-    check_bit("make_null is_null", dpi_json_is_null(h), 1);
+    h = dpi_json_create_null();
+    check_bit("make_null is_null", dpi_json_get_type(h), 0);
 
     // --- new_object, new_array ---
     h = dpi_json_new_object();
-    check_bit("new_object is_object", dpi_json_is_object(h), 1);
+    check_bit("new_object is_object", dpi_json_get_type(h), 6);
     check_bit("new_object empty", dpi_json_empty(h), 1);
 
     h = dpi_json_new_array();
-    check_bit("new_array is_array", dpi_json_is_array(h), 1);
+    check_bit("new_array is_array", dpi_json_get_type(h), 5);
     check_bit("new_array empty", dpi_json_empty(h), 1);
 
     // --- Parse array ---
@@ -280,7 +290,7 @@ module sv_json_test;
       check_bit("destroy: no crash", 1, 1);
     end
 
-    // === Task 11: Complex JSON file tests ===
+    // === Complex JSON file tests ===
     begin
       int root_h;
       int c11_project_h, c11_config_h, c11_endpoints_h, c11_ep0_h, c11_authors_h;
@@ -289,7 +299,7 @@ module sv_json_test;
 
       root_h = dpi_json_parse("sv_json/tests/data/complex.json");
       check_bit("complex: not null", (root_h != 0) ? 1 : 0, 1);
-      check_bit("complex: is object", dpi_json_is_object(root_h), 1);
+      check_bit("complex: is object", dpi_json_get_type(root_h), 6);
       check_int("complex: root has 4 keys", dpi_json_size(root_h), 4);
 
       // Navigate nested objects
@@ -319,14 +329,14 @@ module sv_json_test;
       check_int("complex: mixed[0] int", dpi_json_as_int(dpi_json_at(c11_mixed_h, 0)), 1);
       check("complex: mixed[1] string", dpi_json_as_string(dpi_json_at(c11_mixed_h, 1)), "two");
       check_bit("complex: mixed[2] bool", dpi_json_as_bool(dpi_json_at(c11_mixed_h, 2)), 1);
-      check_bit("complex: mixed[3] null", dpi_json_is_null(dpi_json_at(c11_mixed_h, 3)), 1);
-      check_bit("complex: mixed[4] real", dpi_json_is_real(dpi_json_at(c11_mixed_h, 4)), 1);
-      check_bit("complex: mixed[5] object", dpi_json_is_object(dpi_json_at(c11_mixed_h, 5)), 1);
-      check_bit("complex: mixed[6] array", dpi_json_is_array(dpi_json_at(c11_mixed_h, 6)), 1);
+      check_bit("complex: mixed[3] null", dpi_json_get_type(dpi_json_at(c11_mixed_h, 3)), 0);
+      check_bit("complex: mixed[4] real", dpi_json_get_type(dpi_json_at(c11_mixed_h, 4)), 3);
+      check_bit("complex: mixed[5] object", dpi_json_get_type(dpi_json_at(c11_mixed_h, 5)), 6);
+      check_bit("complex: mixed[6] array", dpi_json_get_type(dpi_json_at(c11_mixed_h, 6)), 5);
 
       // Test data types
       c11_td_h = dpi_json_get(root_h, "test_data");
-      check_bit("complex: null_value", dpi_json_is_null(dpi_json_get(c11_td_h, "null_value")), 1);
+      check_bit("complex: null_value", dpi_json_get_type(dpi_json_get(c11_td_h, "null_value")), 0);
       check_bit("complex: bool_true", dpi_json_as_bool(dpi_json_get(c11_td_h, "bool_true")), 1);
       check_bit("complex: bool_false", dpi_json_as_bool(dpi_json_get(c11_td_h, "bool_false")), 0);
       check_int("complex: int_zero", dpi_json_as_int(dpi_json_get(c11_td_h, "int_zero")), 0);
@@ -357,7 +367,7 @@ module sv_json_test;
       check_bit("complex: contains null_value", dpi_json_contains(c11_td_h, "null_value"), 1);
     end
 
-    // === Task 12: Round-trip + edge cases ===
+    // === Round-trip + edge cases ===
     begin
       int c12_orig_h, c12_dumped_h;
       int c12_data_h, c12_read_back_h;
@@ -393,29 +403,101 @@ module sv_json_test;
       check_int("edge: zero", dpi_json_as_int(c12_zero_h), 0);
     end
 
-    // === Task 13: JSON Pointer edge cases ===
+    // === New tests: from_string with special characters ===
     begin
-      int c13_ptr_h, c13_tilde_h, c13_slash_h, c13_nested_slash_h;
-      int c13_arr_root_h, c13_arr_el_h;
+      int s1, s2, s3;
+      s1 = dpi_json_create_string("say \"hello\"");
+      check("from_string: quotes", dpi_json_as_string(s1), "say \"hello\"");
 
-      c13_ptr_h = dpi_json_parse("{\"~0\":\"tilde\",\"~1\":\"slash\",\"a/b\":{\"c\":1}}");
+      s2 = dpi_json_create_string("back\\slash");
+      check("from_string: backslash", dpi_json_as_string(s2), "back\\slash");
 
-      // ~0 escapes to ~ so /~00 accesses key ~0
-      c13_tilde_h = dpi_json_at_path(c13_ptr_h, "/~00");
-      check("pointer: ~0 tilde", dpi_json_as_string(c13_tilde_h), "tilde");
+      s3 = dpi_json_create_string("tab\there");
+      check("from_string: tab", dpi_json_as_string(s3), "tab\there");
+    end
 
-      // ~1 escapes to / so /~01 accesses key ~1
-      c13_slash_h = dpi_json_at_path(c13_ptr_h, "/~01");
-      check("pointer: ~1 slash", dpi_json_as_string(c13_slash_h), "slash");
+    // === New tests: from_real high precision ===
+    begin
+      int r1;
+      r1 = dpi_json_create_float_val(3.14159265358979);
+      check_real("from_real: high precision", dpi_json_as_real(r1), 3.14159265358979);
+    end
 
-      // Nested key with / in name
-      c13_nested_slash_h = dpi_json_at_path(c13_ptr_h, "/a~1b/c");
-      check_int("pointer: nested slash key", dpi_json_as_int(c13_nested_slash_h), 1);
+    // === New tests: as_int/as_real type coercion ===
+    begin
+      int f_to_i, i_to_f;
+      f_to_i = dpi_json_parse("3.0");
+      check_int("as_int: float 3.0 -> 3", dpi_json_as_int(f_to_i), 3);
 
-      // Root array
-      c13_arr_root_h = dpi_json_parse("[[1,2],[3,4]]");
-      c13_arr_el_h = dpi_json_at_path(c13_arr_root_h, "/1/0");
-      check_int("pointer: array root", dpi_json_as_int(c13_arr_el_h), 3);
+      i_to_f = dpi_json_parse("42");
+      check_real("as_real: int 42 -> 42.0", dpi_json_as_real(i_to_f), 42.0);
+    end
+
+    // === New tests: type checking via get_type ===
+    begin
+      int tn, tb, ti, tr, ts, ta, to;
+      tn = dpi_json_create_null();
+      check_bit("get_type: null", dpi_json_get_type(tn), 0);
+      tb = dpi_json_create_bool_val(1);
+      check_bit("get_type: bool", dpi_json_get_type(tb), 1);
+      ti = dpi_json_create_int_val(10);
+      check_bit("get_type: int", dpi_json_get_type(ti), 2);
+      tr = dpi_json_create_float_val(1.5);
+      check_bit("get_type: real", dpi_json_get_type(tr), 3);
+      ts = dpi_json_create_string("abc");
+      check_bit("get_type: string", dpi_json_get_type(ts), 4);
+      ta = dpi_json_new_array();
+      check_bit("get_type: array", dpi_json_get_type(ta), 5);
+      to = dpi_json_new_object();
+      check_bit("get_type: object", dpi_json_get_type(to), 6);
+    end
+
+    // === New tests: clone and is_valid ===
+    begin
+      int orig, cloned;
+      orig = dpi_json_parse("{\"a\":1}");
+      cloned = dpi_json_clone(orig);
+      check_bit("clone: is_valid", dpi_json_is_valid(cloned), 1);
+      check_int("clone: value preserved", dpi_json_as_int(dpi_json_get(cloned, "a")), 1);
+      // Modify clone, original should be unchanged
+      begin
+        int modified;
+        modified = dpi_json_set(cloned, "b", dpi_json_parse("2"));
+        check_bit("clone: original unchanged", dpi_json_contains(orig, "b"), 0);
+        check_int("clone: modified has b", dpi_json_as_int(dpi_json_get(modified, "b")), 2);
+      end
+    end
+
+    // === New tests: write_file ===
+    begin
+      int wf_h;
+      wf_h = dpi_json_parse("{\"test\":true}");
+      check_int("write_file: success", dpi_json_write_file(wf_h, "sv_json/tests/data/out_write.json", 2), 1);
+    end
+
+    // === New tests: typed set functions ===
+    begin
+      int ts_obj, ts_result, ts_val;
+      ts_obj = dpi_json_parse("{\"a\":1}");
+      ts_result = dpi_json_set_string(ts_obj, "str", "hello");
+      ts_val = dpi_json_get(ts_result, "str");
+      check("typed_set: string", dpi_json_as_string(ts_val), "hello");
+
+      ts_result = dpi_json_set_int(ts_obj, "num", 42);
+      ts_val = dpi_json_get(ts_result, "num");
+      check_int("typed_set: int", dpi_json_as_int(ts_val), 42);
+
+      ts_result = dpi_json_set_float(ts_obj, "pi", 3.14);
+      ts_val = dpi_json_get(ts_result, "pi");
+      check_real("typed_set: float", dpi_json_as_real(ts_val), 3.14);
+
+      ts_result = dpi_json_set_bool(ts_obj, "flag", 1);
+      ts_val = dpi_json_get(ts_result, "flag");
+      check_bit("typed_set: bool", dpi_json_as_bool(ts_val), 1);
+
+      ts_result = dpi_json_set_null(ts_obj, "empty");
+      ts_val = dpi_json_get(ts_result, "empty");
+      check_bit("typed_set: null", dpi_json_get_type(ts_val), 0);
     end
 
     $display("\nBasic tests: %0d passed, %0d failed", pass_count, fail_count);

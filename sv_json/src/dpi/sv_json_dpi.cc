@@ -17,6 +17,22 @@ static int alloc_handle(const json& val) {
     return h;
 }
 
+static json* get_handle(int h) {
+    auto it = g_handles.find(h);
+    if (it == g_handles.end()) return nullptr;
+    return &it->second;
+}
+
+// Persistent string storage for returning const char* safely
+static std::unordered_map<int, std::string> g_strings;
+static int g_next_str_id = 1;
+
+static const char* return_str(const std::string& s) {
+    int id = g_next_str_id++;
+    g_strings[id] = s;
+    return g_strings[id].c_str();
+}
+
 extern "C" {
 
 // === Lifecycle ===
@@ -54,113 +70,73 @@ void dpi_json_destroy(int handle) {
 
 // === Type checking ===
 
-int dpi_json_is_null(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
-    return it->second.is_null() ? 1 : 0;
-}
-
-int dpi_json_is_boolean(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
-    return it->second.is_boolean() ? 1 : 0;
-}
-
-int dpi_json_is_int(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
-    return it->second.is_number_integer() ? 1 : 0;
-}
-
-int dpi_json_is_real(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
-    return it->second.is_number_float() ? 1 : 0;
-}
-
-int dpi_json_is_string(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
-    return it->second.is_string() ? 1 : 0;
-}
-
-int dpi_json_is_array(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
-    return it->second.is_array() ? 1 : 0;
-}
-
-int dpi_json_is_object(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
-    return it->second.is_object() ? 1 : 0;
-}
-
 int dpi_json_get_type(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return -1;
-    const json& val = it->second;
-    if (val.is_null()) return 0;
-    if (val.is_boolean()) return 1;
-    if (val.is_number_integer()) return 2;
-    if (val.is_number_float()) return 3;
-    if (val.is_string()) return 4;
-    if (val.is_array()) return 5;
-    if (val.is_object()) return 6;
+    json* p = get_handle(h);
+    if (!p) return -1;
+    if (p->is_null())           return SV_JSON_TYPE_NULL;
+    if (p->is_boolean())        return SV_JSON_TYPE_BOOL;
+    if (p->is_number_integer()) return SV_JSON_TYPE_INT;
+    if (p->is_number_float())   return SV_JSON_TYPE_FLOAT;
+    if (p->is_string())         return SV_JSON_TYPE_STRING;
+    if (p->is_array())          return SV_JSON_TYPE_ARRAY;
+    if (p->is_object())         return SV_JSON_TYPE_OBJECT;
     return -1;
 }
 
 // === Value extraction ===
 
 const char* dpi_json_as_string(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_string()) return "";
-    return it->second.get_ref<const std::string&>().c_str();
+    json* p = get_handle(h);
+    if (!p || !p->is_string()) return "";
+    return return_str(p->get<std::string>());
 }
 
 int dpi_json_as_int(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_number_integer()) return 0;
-    return it->second.get<int>();
+    json* p = get_handle(h);
+    if (!p) return 0;
+    if (p->is_number_integer()) return p->get<int>();
+    if (p->is_number_float())   return static_cast<int>(p->get<double>());
+    return 0;
 }
 
 double dpi_json_as_real(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_number_float()) return 0.0;
-    return it->second.get<double>();
+    json* p = get_handle(h);
+    if (!p) return 0.0;
+    if (p->is_number()) return p->get<double>();
+    return 0.0;
 }
 
 int dpi_json_as_bool(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_boolean()) return 0;
-    return it->second.get<bool>() ? 1 : 0;
+    json* p = get_handle(h);
+    if (!p || !p->is_boolean()) return 0;
+    return p->get<bool>() ? 1 : 0;
 }
 
 // === Structure access ===
 
 int dpi_json_get(int h, const char* key) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_object()) return 0;
-    if (it->second.contains(key)) {
-        return alloc_handle(it->second[key]);
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return 0;
+    if (p->contains(key)) {
+        return alloc_handle((*p)[key]);
     }
     return 0;
 }
 
 int dpi_json_at(int h, int idx) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_array()) return 0;
-    if (idx >= 0 && idx < (int)it->second.size()) {
-        return alloc_handle(it->second[idx]);
+    json* p = get_handle(h);
+    if (!p || !p->is_array()) return 0;
+    if (idx >= 0 && idx < (int)p->size()) {
+        return alloc_handle((*p)[idx]);
     }
     return 0;
 }
 
 int dpi_json_at_path(int h, const char* path) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
+    json* p = get_handle(h);
+    if (!p) return 0;
     try {
-        json result = it->second.at(json::json_pointer(path));
+        json result = p->at(json::json_pointer(path));
         return alloc_handle(result);
     } catch (...) {
         return 0;
@@ -168,122 +144,204 @@ int dpi_json_at_path(int h, const char* path) {
 }
 
 int dpi_json_contains(int h, const char* key) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_object()) return 0;
-    return it->second.contains(key) ? 1 : 0;
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return 0;
+    return p->contains(key) ? 1 : 0;
 }
 
 int dpi_json_empty(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 1;
-    return it->second.empty() ? 1 : 0;
+    json* p = get_handle(h);
+    if (!p) return 1;
+    return p->empty() ? 1 : 0;
 }
 
 int dpi_json_size(int h) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return 0;
-    if (it->second.is_object() || it->second.is_array()) {
-        return (int)it->second.size();
+    json* p = get_handle(h);
+    if (!p) return 0;
+    if (p->is_object() || p->is_array()) {
+        return (int)p->size();
     }
     return 0;
 }
 
 const char* dpi_json_key_at(int h, int idx) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_object()) return "";
-    if (idx < 0 || idx >= (int)it->second.size()) return "";
-    auto it2 = it->second.begin();
-    std::advance(it2, idx);
-    static thread_local std::string buf;
-    buf = it2.key();
-    return buf.c_str();
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return "";
+    if (idx < 0 || idx >= (int)p->size()) return "";
+    auto it = p->begin();
+    std::advance(it, idx);
+    return return_str(it.key());
 }
 
 // === Modification (returns new handle) ===
 
 int dpi_json_set(int h, const char* key, int val_h) {
-    auto it = g_handles.find(h);
-    auto itv = g_handles.find(val_h);
-    if (it == g_handles.end() || !it->second.is_object()) return 0;
-    if (itv == g_handles.end()) return 0;
-    json new_obj = it->second;
-    new_obj[key] = itv->second;
+    json* p = get_handle(h);
+    json* pv = get_handle(val_h);
+    if (!p || !p->is_object() || !pv) return 0;
+    json new_obj = *p;
+    new_obj[key] = *pv;
     return alloc_handle(new_obj);
 }
 
 int dpi_json_push(int h, int val_h) {
-    auto it = g_handles.find(h);
-    auto itv = g_handles.find(val_h);
-    if (it == g_handles.end() || !it->second.is_array()) return 0;
-    if (itv == g_handles.end()) return 0;
-    json new_arr = it->second;
-    new_arr.push_back(itv->second);
+    json* p = get_handle(h);
+    json* pv = get_handle(val_h);
+    if (!p || !p->is_array() || !pv) return 0;
+    json new_arr = *p;
+    new_arr.push_back(*pv);
     return alloc_handle(new_arr);
 }
 
 int dpi_json_insert_at(int h, int idx, int val_h) {
-    auto it = g_handles.find(h);
-    auto itv = g_handles.find(val_h);
-    if (it == g_handles.end() || !it->second.is_array()) return 0;
-    if (itv == g_handles.end()) return 0;
-    if (idx < 0 || idx > (int)it->second.size()) return 0;
-    json new_arr = it->second;
-    new_arr.insert(new_arr.begin() + idx, itv->second);
+    json* p = get_handle(h);
+    json* pv = get_handle(val_h);
+    if (!p || !p->is_array() || !pv) return 0;
+    if (idx < 0 || idx > (int)p->size()) return 0;
+    json new_arr = *p;
+    new_arr.insert(new_arr.begin() + idx, *pv);
     return alloc_handle(new_arr);
 }
 
 int dpi_json_remove(int h, const char* key) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_object()) return 0;
-    json new_obj = it->second;
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return 0;
+    json new_obj = *p;
     new_obj.erase(key);
     return alloc_handle(new_obj);
 }
 
 int dpi_json_remove_at(int h, int idx) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end() || !it->second.is_array()) return 0;
-    if (idx < 0 || idx >= (int)it->second.size()) return 0;
-    json new_arr = it->second;
+    json* p = get_handle(h);
+    if (!p || !p->is_array()) return 0;
+    if (idx < 0 || idx >= (int)p->size()) return 0;
+    json new_arr = *p;
     new_arr.erase(new_arr.begin() + idx);
     return alloc_handle(new_arr);
 }
 
 int dpi_json_update(int h, int other_h) {
-    auto it = g_handles.find(h);
-    auto ito = g_handles.find(other_h);
-    if (it == g_handles.end() || !it->second.is_object()) return 0;
-    if (ito == g_handles.end() || !ito->second.is_object()) return 0;
-    json new_obj = it->second;
-    new_obj.update(ito->second);
+    json* p = get_handle(h);
+    json* po = get_handle(other_h);
+    if (!p || !p->is_object() || !po || !po->is_object()) return 0;
+    json new_obj = *p;
+    new_obj.update(*po);
     return alloc_handle(new_obj);
 }
 
 // === Serialization ===
 
 const char* dpi_json_dump(int h, int indent) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return "";
-    static thread_local std::string buf;
-    if (indent < 0) {
-        buf = it->second.dump();
-    } else {
-        buf = it->second.dump(indent);
-    }
-    return buf.c_str();
+    json* p = get_handle(h);
+    if (!p) return "null";
+    if (indent < 0) return return_str(p->dump());
+    return return_str(p->dump(indent));
 }
 
 int dpi_json_dump_file(int h, const char* fname, int indent) {
-    auto it = g_handles.find(h);
-    if (it == g_handles.end()) return -1;
+    json* p = get_handle(h);
+    if (!p) return -1;
     std::ofstream f(fname);
     if (!f.is_open()) return -1;
     if (indent < 0) {
-        f << it->second.dump();
+        f << p->dump();
     } else {
-        f << it->second.dump(indent);
+        f << p->dump(indent);
     }
     return f.good() ? 0 : -1;
+}
+
+// === Clone / Free / Valid ===
+
+int dpi_json_clone(int h) {
+    json* p = get_handle(h);
+    if (!p) return 0;
+    return alloc_handle(*p);
+}
+
+void dpi_json_free(int h) {
+    g_handles.erase(h);
+}
+
+int dpi_json_is_valid(int h) {
+    return g_handles.count(h) ? 1 : 0;
+}
+
+// === Create functions for from_* ===
+
+int dpi_json_create_string(const char* val) {
+    return alloc_handle(json(val));
+}
+
+int dpi_json_create_int_val(int val) {
+    return alloc_handle(json(val));
+}
+
+int dpi_json_create_float_val(double val) {
+    return alloc_handle(json(val));
+}
+
+int dpi_json_create_bool_val(int val) {
+    return alloc_handle(json(val != 0));
+}
+
+int dpi_json_create_null(void) {
+    return alloc_handle(json(nullptr));
+}
+
+// === Write file ===
+
+int dpi_json_write_file(int h, const char* path, int indent) {
+    json* p = get_handle(h);
+    if (!p) return 0;
+    try {
+        std::ofstream f(path);
+        if (!f.is_open()) return 0;
+        f << (indent > 0 ? p->dump(indent) : p->dump());
+        return 1;
+    } catch (...) { return 0; }
+}
+
+// === Typed set functions ===
+
+int dpi_json_set_string(int h, const char* key, const char* value) {
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return 0;
+    json new_obj = *p;
+    new_obj[key] = value;
+    return alloc_handle(new_obj);
+}
+
+int dpi_json_set_int(int h, const char* key, int value) {
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return 0;
+    json new_obj = *p;
+    new_obj[key] = value;
+    return alloc_handle(new_obj);
+}
+
+int dpi_json_set_float(int h, const char* key, double value) {
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return 0;
+    json new_obj = *p;
+    new_obj[key] = value;
+    return alloc_handle(new_obj);
+}
+
+int dpi_json_set_bool(int h, const char* key, int value) {
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return 0;
+    json new_obj = *p;
+    new_obj[key] = (value != 0);
+    return alloc_handle(new_obj);
+}
+
+int dpi_json_set_null(int h, const char* key) {
+    json* p = get_handle(h);
+    if (!p || !p->is_object()) return 0;
+    json new_obj = *p;
+    new_obj[key] = nullptr;
+    return alloc_handle(new_obj);
 }
 
 } // extern "C"

@@ -5,20 +5,25 @@
 extern "C" {
 #endif
 
+// Type codes (must match sv_yaml_type_e enum in sv_yaml_pkg.sv)
+#define SV_YAML_TYPE_NULL    0
+#define SV_YAML_TYPE_BOOL    1
+#define SV_YAML_TYPE_INT     2
+#define SV_YAML_TYPE_FLOAT   3
+#define SV_YAML_TYPE_STRING  4
+#define SV_YAML_TYPE_ARRAY   5
+#define SV_YAML_TYPE_OBJECT  6
+
 // Object lifecycle
 int dpi_yaml_new_object(void);
 int dpi_yaml_new_array(void);
 int dpi_yaml_parse(const char* input);
 void dpi_yaml_destroy(int handle);
+int dpi_yaml_clone(int h);
+void dpi_yaml_free(int h);
+int dpi_yaml_is_valid(int h);
 
 // Type checking
-int dpi_yaml_is_null(int h);
-int dpi_yaml_is_boolean(int h);
-int dpi_yaml_is_int(int h);
-int dpi_yaml_is_real(int h);
-int dpi_yaml_is_string(int h);
-int dpi_yaml_is_array(int h);
-int dpi_yaml_is_object(int h);
 int dpi_yaml_get_type(int h);
 
 // Value extraction
@@ -26,6 +31,13 @@ const char* dpi_yaml_as_string(int h);
 int dpi_yaml_as_int(int h);
 double dpi_yaml_as_real(int h);
 int dpi_yaml_as_bool(int h);
+
+// Create functions (for from_* factory methods)
+int dpi_yaml_create_string(const char* val);
+int dpi_yaml_create_int_val(int val);
+int dpi_yaml_create_float_val(double val);
+int dpi_yaml_create_bool_val(int val);
+int dpi_yaml_create_null(void);
 
 // Structure access
 int dpi_yaml_get(int h, const char* key);
@@ -44,9 +56,17 @@ int dpi_yaml_remove(int h, const char* key);
 int dpi_yaml_remove_at(int h, int idx);
 int dpi_yaml_update(int h, int other_h);
 
+// Typed set functions
+int dpi_yaml_set_string(int h, const char* key, const char* value);
+int dpi_yaml_set_int(int h, const char* key, int value);
+int dpi_yaml_set_float(int h, const char* key, double value);
+int dpi_yaml_set_bool(int h, const char* key, int value);
+int dpi_yaml_set_null(int h, const char* key);
+
 // Serialization
 const char* dpi_yaml_dump(int h, int indent);
 int dpi_yaml_dump_file(int h, const char* fname, int indent);
+int dpi_yaml_write_file(int h, const char* path, int indent);
 
 // YAML-specific: multi-document
 int dpi_yaml_parse_all(const char* input);

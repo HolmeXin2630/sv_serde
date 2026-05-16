@@ -12,6 +12,7 @@
 #include <cstring>
 #include <algorithm>
 #include <thread>
+#include <climits>
 
 namespace ryml_ns = c4::yml;
 
@@ -54,14 +55,16 @@ static const YamlNode* get_node(int h) {
 }
 
 // ---------------------------------------------------------------------------
-// Thread-local buffers for returning const char*
+// Persistent string storage for returning const char* safely
 // ---------------------------------------------------------------------------
-static thread_local std::string g_dump_buf;
-static thread_local std::string g_key_buf;
-static thread_local std::string g_tag_buf;
-static thread_local std::string g_anchor_buf;
-static thread_local std::string g_alias_buf;
-static thread_local std::string g_comment_buf;
+static std::unordered_map<int, std::string> g_strings;
+static int g_next_str_id = 1;
+
+static const char* return_str(const std::string& s) {
+    int id = g_next_str_id++;
+    g_strings[id] = s;
+    return g_strings[id].c_str();
+}
 
 // ---------------------------------------------------------------------------
 // rapidyaml -> YamlNode conversion
@@ -74,18 +77,13 @@ static int ryml_to_handle(const ryml_ns::Tree& tree, ryml_ns::id_type node) {
 
         // Helper: resolve a merge key's target map
         auto resolve_merge_target = [&](ryml_ns::id_type child_node) -> int {
-            // The << child might be a map (if alias resolved) or a keyval with alias
             if (tree.is_map(child_node)) {
                 return ryml_to_handle(tree, child_node);
             }
-            // Check if the value is an alias reference
             if (tree.has_val(child_node)) {
                 c4::csubstr val = tree.val(child_node);
-                // val might be "*anchorname" for an alias
                 if (val.len > 1 && val[0] == '*') {
                     std::string anchor_name(val.str + 1, val.len - 1);
-                    // Search for the anchor in the tree
-                    // Anchors are on map/seq nodes, search from root
                     ryml_ns::id_type root = tree.root_id();
                     std::function<ryml_ns::id_type(ryml_ns::id_type, const std::string&)> find_anchor;
                     find_anchor = [&](ryml_ns::id_type n, const std::string& name) -> ryml_ns::id_type {
@@ -201,8 +199,13 @@ static int ryml_to_handle(const ryml_ns::Tree& tree, ryml_ns::id_type node) {
                 char* end_i = nullptr;
                 long long ival = strtoll(val.str, &end_i, 10);
                 if (end_i == val.str + val.len && val.len > 0) {
-                    yn.type = YamlNode::INT_VAL;
-                    yn.int_val = (int)ival;
+                    if (ival > INT_MAX || ival < INT_MIN) {
+                        yn.type = YamlNode::REAL_VAL;
+                        yn.real_val = (double)ival;
+                    } else {
+                        yn.type = YamlNode::INT_VAL;
+                        yn.int_val = (int)ival;
+                    }
                 } else {
                     // Try float
                     char* end_f = nullptr;
@@ -240,7 +243,6 @@ static int ryml_to_handle(const ryml_ns::Tree& tree, ryml_ns::id_type node) {
 // YAML emitter: recursive string builder
 // ---------------------------------------------------------------------------
 static void yaml_escape_string(std::string& out, const std::string& s) {
-    // If the string is simple, emit unquoted
     bool needs_quote = false;
     if (s.empty()) { needs_quote = true; }
     for (char c : s) {
@@ -252,15 +254,12 @@ static void yaml_escape_string(std::string& out, const std::string& s) {
             break;
         }
     }
-    // Check for YAML special values that would be misinterpreted
     if (s == "true" || s == "True" || s == "TRUE" || s == "false" || s == "False" ||
         s == "FALSE" || s == "null" || s == "Null" || s == "NULL" || s == "yes" ||
         s == "no" || s == "on" || s == "off" || s == "~") {
         needs_quote = true;
     }
-    // Check for leading/trailing spaces
     if (s.front() == ' ' || s.back() == ' ') needs_quote = true;
-    // Check if starts with digit (could look like a number)
     if (!s.empty() && (isdigit(s[0]) || s[0] == '-')) needs_quote = true;
 
     if (needs_quote) {
@@ -369,54 +368,55 @@ static std::string emit_yaml_int(int h, int indent_level, bool flow) {
 }
 
 // ---------------------------------------------------------------------------
-// Parse YAML string/file via rapidyaml
+// Parse YAML string/file via rapidyaml (try content first, then file)
 // ---------------------------------------------------------------------------
-static bool is_file_path(const std::string& s) {
-    // Check for common YAML file extensions or path separators
-    if (s.size() >= 5 && (s.substr(s.size() - 5) == ".yaml")) return true;
-    if (s.size() >= 4 && (s.substr(s.size() - 4) == ".yml")) return true;
-    if (s.find('/') != std::string::npos || s.find('\\') != std::string::npos) {
-        // Has path separators — check if file exists
-        std::ifstream ftest(s);
-        if (ftest.is_open()) return true;
-    }
-    return false;
-}
-
-static int parse_yaml_input(const char* input) {
-    if (!input) return 0;
-    std::string s(input);
-    std::string content;
-
-    // Try as file first if it looks like a path
-    if (is_file_path(s)) {
-        std::ifstream f(input);
-        if (f.is_open()) {
-            content = std::string((std::istreambuf_iterator<char>(f)),
-                                  std::istreambuf_iterator<char>());
-        }
-    }
-    if (content.empty()) {
-        content = s;
-    }
-
+static int try_parse_yaml_content(const std::string& content) {
     try {
         c4::csubstr cs = c4::to_csubstr(content);
         ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
         ryml_ns::id_type root_id = tree.root_id();
         // For multi-doc files (--- separator), rapidyaml wraps docs in a SEQ.
-        // Check if root SEQ children are themselves docs (MAPs/SEQs, not scalars).
-        // If so, return just the first document for convenience.
         if (tree.is_seq(root_id) && tree.has_children(root_id)) {
             ryml_ns::id_type first = tree.first_child(root_id);
             if (tree.is_map(first) || (tree.is_seq(first) && tree.has_children(first))) {
                 return ryml_to_handle(tree, first);
             }
         }
-        return ryml_to_handle(tree, root_id);
+        // Only return non-scalar results (map/seq), not scalars
+        if (tree.is_map(root_id) || tree.is_seq(root_id)) {
+            return ryml_to_handle(tree, root_id);
+        }
+        // Scalar parsed successfully but could be a file path — signal to try file
+        return -1;
     } catch (...) {
         return 0;
     }
+}
+
+static int parse_yaml_input(const char* input) {
+    if (!input) return 0;
+    std::string content(input);
+
+    // First: try parsing as YAML content (non-scalar only)
+    int result = try_parse_yaml_content(content);
+    if (result > 0) return result;
+
+    // Second: try as file path (also covers case where content was scalar)
+    std::ifstream f(input);
+    if (f.is_open()) {
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+        result = try_parse_yaml_content(content);
+        if (result > 0) return result;
+    }
+
+    // Last resort: parse as scalar (for inline YAML like "42", "true", etc.)
+    try {
+        c4::csubstr cs = c4::to_csubstr(content);
+        ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
+        return ryml_to_handle(tree, tree.root_id());
+    } catch (...) {}
+    return 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -449,45 +449,21 @@ void dpi_yaml_destroy(int handle) {
 
 // --- Type checking ---
 
-int dpi_yaml_is_null(int h) {
-    const YamlNode* n = get_node(h);
-    return (n && n->type == YamlNode::NULL_VAL) ? 1 : 0;
-}
-
-int dpi_yaml_is_boolean(int h) {
-    const YamlNode* n = get_node(h);
-    return (n && n->type == YamlNode::BOOL_VAL) ? 1 : 0;
-}
-
-int dpi_yaml_is_int(int h) {
-    const YamlNode* n = get_node(h);
-    return (n && n->type == YamlNode::INT_VAL) ? 1 : 0;
-}
-
-int dpi_yaml_is_real(int h) {
-    const YamlNode* n = get_node(h);
-    return (n && n->type == YamlNode::REAL_VAL) ? 1 : 0;
-}
-
-int dpi_yaml_is_string(int h) {
-    const YamlNode* n = get_node(h);
-    return (n && n->type == YamlNode::STRING_VAL) ? 1 : 0;
-}
-
-int dpi_yaml_is_array(int h) {
-    const YamlNode* n = get_node(h);
-    return (n && n->type == YamlNode::SEQ_VAL) ? 1 : 0;
-}
-
-int dpi_yaml_is_object(int h) {
-    const YamlNode* n = get_node(h);
-    return (n && n->type == YamlNode::MAP_VAL) ? 1 : 0;
-}
-
 int dpi_yaml_get_type(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return -1;
-    return (int)n->type;
+    // Map C++ YamlNode::Type to SV sv_yaml_type_e values
+    // C++: MAP_VAL=5, SEQ_VAL=6  SV: ARRAY=5, OBJECT=6
+    switch (n->type) {
+        case YamlNode::NULL_VAL:   return SV_YAML_TYPE_NULL;
+        case YamlNode::BOOL_VAL:   return SV_YAML_TYPE_BOOL;
+        case YamlNode::INT_VAL:    return SV_YAML_TYPE_INT;
+        case YamlNode::REAL_VAL:   return SV_YAML_TYPE_FLOAT;
+        case YamlNode::STRING_VAL: return SV_YAML_TYPE_STRING;
+        case YamlNode::MAP_VAL:    return SV_YAML_TYPE_OBJECT;
+        case YamlNode::SEQ_VAL:    return SV_YAML_TYPE_ARRAY;
+        default: return -1;
+    }
 }
 
 // --- Value extraction ---
@@ -496,32 +472,22 @@ const char* dpi_yaml_as_string(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return "";
     switch (n->type) {
-        case YamlNode::STRING_VAL:  return n->str_val.c_str();
-        case YamlNode::INT_VAL: {
-            g_dump_buf = std::to_string(n->int_val);
-            return g_dump_buf.c_str();
-        }
+        case YamlNode::STRING_VAL:  return return_str(n->str_val);
+        case YamlNode::INT_VAL:     return return_str(std::to_string(n->int_val));
         case YamlNode::REAL_VAL: {
             std::ostringstream oss;
             oss << n->real_val;
-            g_dump_buf = oss.str();
-            return g_dump_buf.c_str();
+            return return_str(oss.str());
         }
-        case YamlNode::BOOL_VAL: {
-            g_dump_buf = n->bool_val ? "true" : "false";
-            return g_dump_buf.c_str();
-        }
-        case YamlNode::NULL_VAL:
-            return "null";
-        default:
-            return "";
+        case YamlNode::BOOL_VAL:    return return_str(n->bool_val ? "true" : "false");
+        case YamlNode::NULL_VAL:    return "null";
+        default:                    return "";
     }
 }
 
 int dpi_yaml_as_int(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return 0;
-    // Allow coercion
     switch (n->type) {
         case YamlNode::INT_VAL:   return n->int_val;
         case YamlNode::REAL_VAL:  return (int)n->real_val;
@@ -551,13 +517,69 @@ int dpi_yaml_as_bool(int h) {
     }
 }
 
+// --- Create functions ---
+
+int dpi_yaml_create_string(const char* val) {
+    YamlNode n;
+    n.type = YamlNode::STRING_VAL;
+    n.str_val = val ? val : "";
+    return alloc_handle(n);
+}
+
+int dpi_yaml_create_int_val(int val) {
+    YamlNode n;
+    n.type = YamlNode::INT_VAL;
+    n.int_val = val;
+    return alloc_handle(n);
+}
+
+int dpi_yaml_create_float_val(double val) {
+    YamlNode n;
+    n.type = YamlNode::REAL_VAL;
+    n.real_val = val;
+    return alloc_handle(n);
+}
+
+int dpi_yaml_create_bool_val(int val) {
+    YamlNode n;
+    n.type = YamlNode::BOOL_VAL;
+    n.bool_val = (val != 0);
+    return alloc_handle(n);
+}
+
+int dpi_yaml_create_null(void) {
+    YamlNode n;
+    n.type = YamlNode::NULL_VAL;
+    return alloc_handle(n);
+}
+
+// --- Clone / Free / Valid ---
+
+int dpi_yaml_clone(int h) {
+    const YamlNode* n = get_node(h);
+    if (!n) return 0;
+    return alloc_handle(*n);
+}
+
+void dpi_yaml_free(int h) {
+    g_handles.erase(h);
+}
+
+int dpi_yaml_is_valid(int h) {
+    return g_handles.count(h) ? 1 : 0;
+}
+
 // --- Structure access ---
 
 int dpi_yaml_get(int h, const char* key) {
     const YamlNode* n = get_node(h);
     if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
     for (auto& p : n->map_children) {
-        if (p.first == key) return p.second;
+        if (p.first == key) {
+            const YamlNode* child = get_node(p.second);
+            if (!child) return 0;
+            return alloc_handle(*child);  // deep copy
+        }
     }
     return 0;
 }
@@ -566,7 +588,9 @@ int dpi_yaml_at(int h, int idx) {
     const YamlNode* n = get_node(h);
     if (!n || n->type != YamlNode::SEQ_VAL) return 0;
     if (idx >= 0 && idx < (int)n->seq_children.size()) {
-        return n->seq_children[idx];
+        const YamlNode* child = get_node(n->seq_children[idx]);
+        if (!child) return 0;
+        return alloc_handle(*child);  // deep copy
     }
     return 0;
 }
@@ -581,6 +605,13 @@ int dpi_yaml_at_path(int h, const char* path) {
     while (pos < p.size()) {
         size_t next = p.find('/', pos);
         std::string segment = p.substr(pos, next - pos);
+
+        // RFC 6901: ~1 -> / , ~0 -> ~ (order matters: ~1 first)
+        size_t tilde;
+        while ((tilde = segment.find("~1")) != std::string::npos)
+            segment.replace(tilde, 2, "/");
+        while ((tilde = segment.find("~0")) != std::string::npos)
+            segment.replace(tilde, 2, "~");
 
         const YamlNode* cur = get_node(current);
         if (!cur) return 0;
@@ -630,8 +661,7 @@ const char* dpi_yaml_key_at(int h, int idx) {
     const YamlNode* n = get_node(h);
     if (!n || n->type != YamlNode::MAP_VAL) return "";
     if (idx < 0 || idx >= (int)n->map_children.size()) return "";
-    g_key_buf = n->map_children[idx].first;
-    return g_key_buf.c_str();
+    return return_str(n->map_children[idx].first);
 }
 
 // --- Modification (returns new handle, original unchanged) ---
@@ -712,13 +742,113 @@ int dpi_yaml_update(int h, int other_h) {
     return alloc_handle(new_node);
 }
 
+// --- Typed set functions ---
+
+int dpi_yaml_set_string(int h, const char* key, const char* value) {
+    const YamlNode* n = get_node(h);
+    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    YamlNode new_node = *n;
+    YamlNode val_node;
+    val_node.type = YamlNode::STRING_VAL;
+    val_node.str_val = value ? value : "";
+    int vh = alloc_handle(val_node);
+    bool found = false;
+    for (auto& p : new_node.map_children) {
+        if (p.first == key) {
+            p.second = vh;
+            found = true;
+            break;
+        }
+    }
+    if (!found) new_node.map_children.push_back({key, vh});
+    return alloc_handle(new_node);
+}
+
+int dpi_yaml_set_int(int h, const char* key, int value) {
+    const YamlNode* n = get_node(h);
+    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    YamlNode new_node = *n;
+    YamlNode val_node;
+    val_node.type = YamlNode::INT_VAL;
+    val_node.int_val = value;
+    int vh = alloc_handle(val_node);
+    bool found = false;
+    for (auto& p : new_node.map_children) {
+        if (p.first == key) {
+            p.second = vh;
+            found = true;
+            break;
+        }
+    }
+    if (!found) new_node.map_children.push_back({key, vh});
+    return alloc_handle(new_node);
+}
+
+int dpi_yaml_set_float(int h, const char* key, double value) {
+    const YamlNode* n = get_node(h);
+    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    YamlNode new_node = *n;
+    YamlNode val_node;
+    val_node.type = YamlNode::REAL_VAL;
+    val_node.real_val = value;
+    int vh = alloc_handle(val_node);
+    bool found = false;
+    for (auto& p : new_node.map_children) {
+        if (p.first == key) {
+            p.second = vh;
+            found = true;
+            break;
+        }
+    }
+    if (!found) new_node.map_children.push_back({key, vh});
+    return alloc_handle(new_node);
+}
+
+int dpi_yaml_set_bool(int h, const char* key, int value) {
+    const YamlNode* n = get_node(h);
+    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    YamlNode new_node = *n;
+    YamlNode val_node;
+    val_node.type = YamlNode::BOOL_VAL;
+    val_node.bool_val = (value != 0);
+    int vh = alloc_handle(val_node);
+    bool found = false;
+    for (auto& p : new_node.map_children) {
+        if (p.first == key) {
+            p.second = vh;
+            found = true;
+            break;
+        }
+    }
+    if (!found) new_node.map_children.push_back({key, vh});
+    return alloc_handle(new_node);
+}
+
+int dpi_yaml_set_null(int h, const char* key) {
+    const YamlNode* n = get_node(h);
+    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    YamlNode new_node = *n;
+    YamlNode val_node;
+    val_node.type = YamlNode::NULL_VAL;
+    int vh = alloc_handle(val_node);
+    bool found = false;
+    for (auto& p : new_node.map_children) {
+        if (p.first == key) {
+            p.second = vh;
+            found = true;
+            break;
+        }
+    }
+    if (!found) new_node.map_children.push_back({key, vh});
+    return alloc_handle(new_node);
+}
+
 // --- Serialization ---
 
 const char* dpi_yaml_dump(int h, int indent) {
     const YamlNode* n = get_node(h);
     if (!n) return "";
-    g_dump_buf = emit_yaml_int(h, indent, false);
-    return g_dump_buf.c_str();
+    return return_str(emit_yaml_int(h, indent, false));
 }
 
 int dpi_yaml_dump_file(int h, const char* fname, int indent) {
@@ -731,43 +861,50 @@ int dpi_yaml_dump_file(int h, const char* fname, int indent) {
     return f.good() ? 0 : -1;
 }
 
+int dpi_yaml_write_file(int h, const char* path, int indent) {
+    return dpi_yaml_dump_file(h, path, indent);
+}
+
 // --- YAML-specific: multi-document ---
 
 int dpi_yaml_parse_all(const char* input) {
     if (!input) return 0;
-    std::string s(input);
-    std::string content;
+    std::string content(input);
 
-    // Try as file first if it looks like a path
-    if (is_file_path(s)) {
-        std::ifstream f(input);
-        if (f.is_open()) {
-            content = std::string((std::istreambuf_iterator<char>(f)),
-                                  std::istreambuf_iterator<char>());
-        }
-    }
-    if (content.empty()) {
-        content = s;
-    }
-
-    try {
-        c4::csubstr cs = c4::to_csubstr(content);
-        ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
-        YamlNode root;
-        root.type = YamlNode::SEQ_VAL;
-        ryml_ns::id_type root_id = tree.root_id();
-        if (tree.has_children(root_id)) {
-            ryml_ns::id_type child = tree.first_child(root_id);
-            while (child != ryml_ns::NONE) {
-                int dh = ryml_to_handle(tree, child);
-                root.seq_children.push_back(dh);
-                child = tree.next_sibling(child);
+    auto parse_as_docs = [](const std::string& s) -> int {
+        try {
+            c4::csubstr cs = c4::to_csubstr(s);
+            ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
+            ryml_ns::id_type root_id = tree.root_id();
+            // If root is a scalar, this is probably a file path, not YAML content
+            if (!tree.is_seq(root_id) && !tree.is_map(root_id)) return 0;
+            YamlNode root;
+            root.type = YamlNode::SEQ_VAL;
+            if (tree.has_children(root_id)) {
+                ryml_ns::id_type child = tree.first_child(root_id);
+                while (child != ryml_ns::NONE) {
+                    int dh = ryml_to_handle(tree, child);
+                    root.seq_children.push_back(dh);
+                    child = tree.next_sibling(child);
+                }
             }
-        }
-        return alloc_handle(root);
-    } catch (...) {
-        return 0;
+            return alloc_handle(root);
+        } catch (...) { return 0; }
+    };
+
+    // Try as YAML content first
+    int result = parse_as_docs(content);
+    if (result > 0) return result;
+
+    // Try as file
+    std::ifstream f(input);
+    if (f.is_open()) {
+        content = std::string((std::istreambuf_iterator<char>(f)),
+                              std::istreambuf_iterator<char>());
+        result = parse_as_docs(content);
+        if (result > 0) return result;
     }
+    return 0;
 }
 
 // --- YAML-specific: comments ---
@@ -775,8 +912,7 @@ int dpi_yaml_parse_all(const char* input) {
 const char* dpi_yaml_comments(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return "";
-    g_comment_buf = n->comment;
-    return g_comment_buf.c_str();
+    return return_str(n->comment);
 }
 
 int dpi_yaml_set_comment(int h, const char* text) {
@@ -792,8 +928,7 @@ int dpi_yaml_set_comment(int h, const char* text) {
 const char* dpi_yaml_anchor(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return "";
-    g_anchor_buf = n->anchor;
-    return g_anchor_buf.c_str();
+    return return_str(n->anchor);
 }
 
 int dpi_yaml_set_anchor(int h, const char* name) {
@@ -807,8 +942,7 @@ int dpi_yaml_set_anchor(int h, const char* name) {
 const char* dpi_yaml_alias(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return "";
-    g_alias_buf = n->alias_name;
-    return g_alias_buf.c_str();
+    return return_str(n->alias_name);
 }
 
 // --- YAML-specific: tags ---
@@ -816,8 +950,7 @@ const char* dpi_yaml_alias(int h) {
 const char* dpi_yaml_tag(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return "";
-    g_tag_buf = n->tag;
-    return g_tag_buf.c_str();
+    return return_str(n->tag);
 }
 
 int dpi_yaml_set_tag(int h, const char* tag) {
@@ -833,18 +966,17 @@ int dpi_yaml_set_tag(int h, const char* tag) {
 const char* dpi_yaml_dump_flow(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return "";
-    g_dump_buf = emit_yaml_int(h, 0, true);
-    return g_dump_buf.c_str();
+    return return_str(emit_yaml_int(h, 0, true));
 }
 
 const char* dpi_yaml_dump_with_comments(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return "";
-    g_dump_buf = emit_yaml_int(h, 0, false);
+    std::string result = emit_yaml_int(h, 0, false);
     if (!n->comment.empty()) {
-        g_dump_buf = "# " + n->comment + "\n" + g_dump_buf;
+        result = "# " + n->comment + "\n" + result;
     }
-    return g_dump_buf.c_str();
+    return return_str(result);
 }
 
 } // extern "C"
