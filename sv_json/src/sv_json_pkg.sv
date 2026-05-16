@@ -81,36 +81,45 @@ package sv_json_pkg;
 
     static function sv_json parse(string input_str);
       int h = dpi_json_parse(input_str);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     static function sv_json new_object();
-      return new(dpi_json_new_object(), SV_JSON_OBJECT);
+      sv_json tmp = new(dpi_json_new_object(), SV_JSON_OBJECT);
+      return tmp;
     endfunction
 
     static function sv_json new_array();
-      return new(dpi_json_new_array(), SV_JSON_ARRAY);
+      sv_json tmp = new(dpi_json_new_array(), SV_JSON_ARRAY);
+      return tmp;
     endfunction
 
     static function sv_json from_string(string val);
-      return new(dpi_json_create_string(val), SV_JSON_STRING);
+      sv_json tmp = new(dpi_json_create_string(val), SV_JSON_STRING);
+      return tmp;
     endfunction
 
     static function sv_json from_int(int val);
-      return new(dpi_json_create_int_val(val), SV_JSON_INT);
+      sv_json tmp = new(dpi_json_create_int_val(val), SV_JSON_INT);
+      return tmp;
     endfunction
 
     static function sv_json from_real(real val);
-      return new(dpi_json_create_float_val(val), SV_JSON_REAL);
+      sv_json tmp = new(dpi_json_create_float_val(val), SV_JSON_REAL);
+      return tmp;
     endfunction
 
     static function sv_json from_bool(bit val);
-      return new(dpi_json_create_bool_val(val ? 1 : 0), SV_JSON_BOOLEAN);
+      sv_json tmp = new(dpi_json_create_bool_val(val ? 1 : 0), SV_JSON_BOOLEAN);
+      return tmp;
     endfunction
 
     static function sv_json make_null();
-      return new(dpi_json_create_null(), SV_JSON_NULL);
+      sv_json tmp = new(dpi_json_create_null(), SV_JSON_NULL);
+      return tmp;
     endfunction
 
     static function void set_strict_mode(bit enable);
@@ -185,20 +194,26 @@ package sv_json_pkg;
 
     function sv_json get(string key);
       int h = dpi_json_get(m_handle, key);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     function sv_json at(int idx);
       int h = dpi_json_at(m_handle, idx);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     function sv_json at_path(string path);
       int h = dpi_json_at_path(m_handle, path);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     function bit contains(string key);
@@ -218,9 +233,10 @@ package sv_json_pkg;
     endfunction
 
     function void get_keys(output string keys[$]);
+      int n;
       keys = {};
       if (!is_object()) return;
-      int n = size();
+      n = size();
       for (int i = 0; i < n; i++) begin
         keys.push_back(key_at(i));
       end
@@ -230,38 +246,50 @@ package sv_json_pkg;
 
     function sv_json set(string key, sv_json value);
       int h = dpi_json_set(m_handle, key, value.m_handle);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     function sv_json push(sv_json value);
       int h = dpi_json_push(m_handle, value.m_handle);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     function sv_json insert_at(int idx, sv_json value);
       int h = dpi_json_insert_at(m_handle, idx, value.m_handle);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     function sv_json remove(string key);
       int h = dpi_json_remove(m_handle, key);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     function sv_json remove_at(int idx);
       int h = dpi_json_remove_at(m_handle, idx);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     function sv_json update(sv_json other);
       int h = dpi_json_update(m_handle, other.m_handle);
+      sv_json tmp;
       if (h == 0) return null;
-      return new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
     endfunction
 
     // --- Serialization ---
