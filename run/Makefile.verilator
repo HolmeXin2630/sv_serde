@@ -18,6 +18,11 @@ YAML_TEST = tests/test_yaml_class.sv
 YAML_TOP = test_yaml_class
 YAML_OBJ_DIR = obj_dir_yaml_class
 
+UNIFIED_CFLAGS = -std=c++14 -I$(abspath sv_json/src/dpi) -I$(abspath sv_yaml/src/dpi) -I$(abspath sv_serde/src/dpi)
+UNIFIED_TEST = tests/test_serde_unified.sv
+UNIFIED_TOP = test_serde_unified
+UNIFIED_OBJ_DIR = obj_dir_serde_unified
+
 .PHONY: run_test_json run_test_yaml run_test_class run_test_all clean
 
 run_test_json:
@@ -44,11 +49,26 @@ run_test_yaml:
 		-o test_yaml_class
 	./$(YAML_OBJ_DIR)/test_yaml_class
 
+run_test_unified:
+	$(VERILATOR) $(VERILATOR_FLAGS) -CFLAGS "$(UNIFIED_CFLAGS)" \
+		sv_serde/src/sv_serde_pkg.sv \
+		$(JSON_PKG) \
+		$(YAML_PKG) \
+		$(UNIFIED_TEST) \
+		$(JSON_DPI) \
+		$(YAML_DPI) \
+		$(SERDE_DPI) \
+		--top-module $(UNIFIED_TOP) \
+		--Mdir $(UNIFIED_OBJ_DIR) \
+		-o test_serde_unified
+	./$(UNIFIED_OBJ_DIR)/test_serde_unified
+
 run_test_class: run_test_json
 
 run_test_all:
 	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) run_test_json
 	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) run_test_yaml
+	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) run_test_unified
 	@echo "All tests passed!"
 
 clean:
