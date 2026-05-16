@@ -61,6 +61,9 @@ const char* dpi_json_dump(int h, int indent);
 int dpi_json_dump_file(int h, const char* fname, int indent);
 int dpi_json_write_file(int h, const char* path, int indent);
 
+	// Error reporting
+	const char* dpi_serde_last_error(void);
+
 #ifdef __cplusplus
 }
 #endif
