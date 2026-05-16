@@ -76,6 +76,9 @@ package sv_yaml_pkg;
   import "DPI-C" function string dpi_yaml_dump_flow(input int h);
   import "DPI-C" function string dpi_yaml_dump_with_comments(input int h);
 
+  // Strict mode flag
+  bit strict_mode = 0;
+
   class sv_yaml;
     local int m_handle;
     local sv_yaml_type_e m_type;
@@ -119,6 +122,10 @@ package sv_yaml_pkg;
       return new(dpi_yaml_create_null(), SV_YAML_NULL);
     endfunction
 
+    static function void set_strict_mode(bit enable);
+      strict_mode = enable;
+    endfunction
+
     function bit is_null();    return m_type == SV_YAML_NULL;    endfunction
     function bit is_boolean(); return m_type == SV_YAML_BOOLEAN; endfunction
     function bit is_int();     return m_type == SV_YAML_INT;     endfunction
@@ -126,12 +133,56 @@ package sv_yaml_pkg;
     function bit is_string();  return m_type == SV_YAML_STRING;  endfunction
     function bit is_array();   return m_type == SV_YAML_ARRAY;   endfunction
     function bit is_object();  return m_type == SV_YAML_OBJECT;  endfunction
+
+    function bit is_number();
+      return is_int() || is_real();
+    endfunction
+
     function sv_yaml_type_e get_type(); return m_type; endfunction
 
-    function string as_string(); return dpi_yaml_as_string(m_handle); endfunction
-    function int as_int(); return dpi_yaml_as_int(m_handle); endfunction
-    function real as_real(); return dpi_yaml_as_real(m_handle); endfunction
-    function bit as_bool(); return dpi_yaml_as_bool(m_handle); endfunction
+    function string as_string();
+      if (strict_mode && !is_string()) $fatal(1, "Not a string");
+      return dpi_yaml_as_string(m_handle);
+    endfunction
+
+    function int as_int();
+      if (strict_mode && !is_int()) $fatal(1, "Not an int");
+      return dpi_yaml_as_int(m_handle);
+    endfunction
+
+    function real as_real();
+      if (strict_mode && !is_real()) $fatal(1, "Not a real");
+      return dpi_yaml_as_real(m_handle);
+    endfunction
+
+    function bit as_bool();
+      if (strict_mode && !is_boolean()) $fatal(1, "Not a boolean");
+      return dpi_yaml_as_bool(m_handle);
+    endfunction
+
+    function string value_string(string key, string default_val);
+      sv_yaml v = get(key);
+      if (v == null || !v.is_string()) return default_val;
+      return v.as_string();
+    endfunction
+
+    function int value_int(string key, int default_val);
+      sv_yaml v = get(key);
+      if (v == null || !v.is_int()) return default_val;
+      return v.as_int();
+    endfunction
+
+    function real value_real(string key, real default_val);
+      sv_yaml v = get(key);
+      if (v == null || !v.is_real()) return default_val;
+      return v.as_real();
+    endfunction
+
+    function bit value_bool(string key, bit default_val);
+      sv_yaml v = get(key);
+      if (v == null || !v.is_boolean()) return default_val;
+      return v.as_bool();
+    endfunction
 
     function sv_yaml get(string key);
       int h = dpi_yaml_get(m_handle, key);
@@ -156,6 +207,15 @@ package sv_yaml_pkg;
     function int size(); return dpi_yaml_size(m_handle); endfunction
     function string key_at(int idx); return dpi_yaml_key_at(m_handle, idx); endfunction
 
+    function void get_keys(output string keys[$]);
+      keys = {};
+      if (!is_object()) return;
+      int n = size();
+      for (int i = 0; i < n; i++) begin
+        keys.push_back(key_at(i));
+      end
+    endfunction
+
     function sv_yaml set(string key, sv_yaml value);
       int h = dpi_yaml_set(m_handle, key, value.m_handle);
       if (h == 0) return null;
@@ -168,8 +228,26 @@ package sv_yaml_pkg;
       return new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
     endfunction
 
+    function sv_yaml insert_at(int idx, sv_yaml value);
+      int h = dpi_yaml_insert_at(m_handle, idx, value.m_handle);
+      if (h == 0) return null;
+      return new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
+    endfunction
+
     function sv_yaml remove(string key);
       int h = dpi_yaml_remove(m_handle, key);
+      if (h == 0) return null;
+      return new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
+    endfunction
+
+    function sv_yaml remove_at(int idx);
+      int h = dpi_yaml_remove_at(m_handle, idx);
+      if (h == 0) return null;
+      return new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
+    endfunction
+
+    function sv_yaml update(sv_yaml other);
+      int h = dpi_yaml_update(m_handle, other.m_handle);
       if (h == 0) return null;
       return new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
     endfunction
@@ -180,6 +258,10 @@ package sv_yaml_pkg;
         return (rc == 0) ? "ok" : "error";
       end
       return dpi_yaml_dump(m_handle, indent);
+    endfunction
+
+    function int dump_file(string fname, int indent = 2);
+      return dpi_yaml_dump_file(m_handle, fname, indent);
     endfunction
 
     // YAML-specific

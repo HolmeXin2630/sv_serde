@@ -20,7 +20,8 @@ namespace ryml_ns = c4::yml;
 // YamlNode: custom in-memory tree node
 // ---------------------------------------------------------------------------
 struct YamlNode {
-    enum Type { NULL_VAL, BOOL_VAL, INT_VAL, REAL_VAL, STRING_VAL, MAP_VAL, SEQ_VAL };
+    // Order must match SERDE_TYPE_* macros in serde_common.h
+    enum Type { NULL_VAL, BOOL_VAL, INT_VAL, REAL_VAL, STRING_VAL, SEQ_VAL, MAP_VAL };
     Type type = NULL_VAL;
     std::string str_val;
     int int_val = 0;
@@ -36,6 +37,15 @@ struct YamlNode {
     std::string alias_name;
     std::string tag;
 };
+
+// Ensure YamlNode::Type values match SERDE_TYPE_* macros
+static_assert(YamlNode::NULL_VAL   == SERDE_TYPE_NULL,   "NULL_VAL mismatch");
+static_assert(YamlNode::BOOL_VAL   == SERDE_TYPE_BOOL,   "BOOL_VAL mismatch");
+static_assert(YamlNode::INT_VAL    == SERDE_TYPE_INT,    "INT_VAL mismatch");
+static_assert(YamlNode::REAL_VAL   == SERDE_TYPE_FLOAT,  "REAL_VAL mismatch");
+static_assert(YamlNode::STRING_VAL == SERDE_TYPE_STRING, "STRING_VAL mismatch");
+static_assert(YamlNode::SEQ_VAL    == SERDE_TYPE_ARRAY,  "SEQ_VAL mismatch");
+static_assert(YamlNode::MAP_VAL    == SERDE_TYPE_OBJECT, "MAP_VAL mismatch");
 
 // ---------------------------------------------------------------------------
 // Global handle table
@@ -452,18 +462,7 @@ void dpi_yaml_destroy(int handle) {
 int dpi_yaml_get_type(int h) {
     const YamlNode* n = get_node(h);
     if (!n) return -1;
-    // Map C++ YamlNode::Type to SV sv_yaml_type_e values
-    // C++: MAP_VAL=5, SEQ_VAL=6  SV: ARRAY=5, OBJECT=6
-    switch (n->type) {
-        case YamlNode::NULL_VAL:   return SV_YAML_TYPE_NULL;
-        case YamlNode::BOOL_VAL:   return SV_YAML_TYPE_BOOL;
-        case YamlNode::INT_VAL:    return SV_YAML_TYPE_INT;
-        case YamlNode::REAL_VAL:   return SV_YAML_TYPE_FLOAT;
-        case YamlNode::STRING_VAL: return SV_YAML_TYPE_STRING;
-        case YamlNode::MAP_VAL:    return SV_YAML_TYPE_OBJECT;
-        case YamlNode::SEQ_VAL:    return SV_YAML_TYPE_ARRAY;
-        default: return -1;
-    }
+    return (int)n->type;  // Enum values match SERDE_TYPE_* macros
 }
 
 // --- Value extraction ---

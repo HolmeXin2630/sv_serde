@@ -2,6 +2,8 @@ module sv_yaml_test;
   int pass_count = 0;
   int fail_count = 0;
 
+  `include "serde_test_helpers.sv"
+
   // DPI imports — lifecycle
   import "DPI-C" function int    dpi_yaml_new_object();
   import "DPI-C" function int    dpi_yaml_new_array();
@@ -67,46 +69,6 @@ module sv_yaml_test;
   import "DPI-C" function int    dpi_yaml_set_tag(input int h, input string tag);
   import "DPI-C" function string dpi_yaml_dump_flow(input int h);
   import "DPI-C" function string dpi_yaml_dump_with_comments(input int h);
-
-  task automatic check(string test_name, string actual, string expected);
-    if (actual == expected) begin
-      $display("[PASS] %s: got '%s'", test_name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected '%s', got '%s'", test_name, expected, actual);
-      fail_count++;
-    end
-  endtask
-
-  task automatic check_int(string test_name, int actual, int expected);
-    if (actual == expected) begin
-      $display("[PASS] %s: got %0d", test_name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected %0d, got %0d", test_name, expected, actual);
-      fail_count++;
-    end
-  endtask
-
-  task automatic check_bit(string test_name, int actual, int expected);
-    if (actual == expected) begin
-      $display("[PASS] %s: got %0d", test_name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected %0d, got %0d", test_name, expected, actual);
-      fail_count++;
-    end
-  endtask
-
-  task automatic check_real(string test_name, real actual, real expected);
-    if (actual == expected) begin
-      $display("[PASS] %s: got %f", test_name, actual);
-      pass_count++;
-    end else begin
-      $display("[FAIL] %s: expected %f, got %f", test_name, expected, actual);
-      fail_count++;
-    end
-  endtask
 
   initial begin
     int el;
@@ -550,6 +512,105 @@ module sv_yaml_test;
       cloned = dpi_yaml_clone(orig);
       check_bit("clone: is_valid", dpi_yaml_is_valid(cloned), 1);
       check_int("clone: value preserved", dpi_yaml_as_int(dpi_yaml_get(cloned, "a")), 1);
+    end
+
+    // === Negative tests: null handle operations ===
+    begin
+      int null_h = 0;
+      check_int("null handle: get_type returns -1", dpi_yaml_get_type(null_h), -1);
+      check("null handle: as_string empty", dpi_yaml_as_string(null_h), "");
+      check_int("null handle: as_int returns 0", dpi_yaml_as_int(null_h), 0);
+      check_real("null handle: as_real returns 0", dpi_yaml_as_real(null_h), 0.0);
+      check_bit("null handle: as_bool returns 0", dpi_yaml_as_bool(null_h), 0);
+      check_bit("null handle: is_valid returns 0", dpi_yaml_is_valid(null_h), 0);
+    end
+
+    // === Negative tests: type mismatch coercion ===
+    begin
+      int str_h, arr_h, obj_h, null_h2;
+      str_h = dpi_yaml_parse("\"hello\"");
+      check_int("mismatch: as_int on string returns 0", dpi_yaml_as_int(str_h), 0);
+      check_real("mismatch: as_real on string returns 0", dpi_yaml_as_real(str_h), 0.0);
+      check_bit("mismatch: as_bool on string returns 0", dpi_yaml_as_bool(str_h), 0);
+
+      arr_h = dpi_yaml_parse("[1,2,3]");
+      check("mismatch: as_string on array", dpi_yaml_as_string(arr_h), "");
+      check_int("mismatch: as_int on array returns 0", dpi_yaml_as_int(arr_h), 0);
+
+      obj_h = dpi_yaml_parse("{\"a\":1}");
+      check("mismatch: as_string on object", dpi_yaml_as_string(obj_h), "");
+      check_int("mismatch: as_int on object returns 0", dpi_yaml_as_int(obj_h), 0);
+
+      null_h2 = dpi_yaml_create_null();
+      check("mismatch: as_string on null", dpi_yaml_as_string(null_h2), "null");
+      check_int("mismatch: as_int on null returns 0", dpi_yaml_as_int(null_h2), 0);
+      check_bit("mismatch: as_bool on null returns 0", dpi_yaml_as_bool(null_h2), 0);
+    end
+
+    // === Negative tests: out-of-bounds access ===
+    begin
+      int arr_h, val_h;
+      arr_h = dpi_yaml_parse("[1,2,3]");
+      val_h = dpi_yaml_at(arr_h, 99);
+      check_bit("oob: at(99) returns null", (val_h == 0) ? 1 : 0, 1);
+      val_h = dpi_yaml_at(arr_h, -1);
+      check_bit("oob: at(-1) returns null", (val_h == 0) ? 1 : 0, 1);
+    end
+
+    // === Negative tests: operations on wrong container type ===
+    begin
+      int str_h2, val_h2;
+      str_h2 = dpi_yaml_parse("\"hello\"");
+      val_h2 = dpi_yaml_get(str_h2, "key");
+      check_bit("wrong type: get on string returns null", (val_h2 == 0) ? 1 : 0, 1);
+      val_h2 = dpi_yaml_at(str_h2, 0);
+      check_bit("wrong type: at on string returns null", (val_h2 == 0) ? 1 : 0, 1);
+      check_int("wrong type: size on string returns 0", dpi_yaml_size(str_h2), 0);
+      // Note: rapidyaml empty() checks node children, not string content
+      check_bit("wrong type: empty on string returns 1", dpi_yaml_empty(str_h2), 1);
+    end
+
+    // === Negative tests: remove non-existent key ===
+    begin
+      int obj_h2, result_h;
+      obj_h2 = dpi_yaml_parse("{\"a\":1}");
+      result_h = dpi_yaml_remove(obj_h2, "nonexistent");
+      check_bit("remove nonexistent: not null", (result_h != 0) ? 1 : 0, 1);
+      check_int("remove nonexistent: size unchanged", dpi_yaml_size(result_h), 1);
+    end
+
+    // === Stress tests ===
+    begin
+      int big_arr, big_obj, deep_h;
+      string long_str;
+
+      // Large array
+      big_arr = dpi_yaml_new_array();
+      for (int i = 0; i < 100; i++) begin
+        big_arr = dpi_yaml_push(big_arr, dpi_yaml_create_int_val(i));
+      end
+      check_int("stress: 100-element array size", dpi_yaml_size(big_arr), 100);
+      check_int("stress: 100-element array[99]", dpi_yaml_as_int(dpi_yaml_at(big_arr, 99)), 99);
+
+      // Large object
+      big_obj = dpi_yaml_new_object();
+      for (int i = 0; i < 50; i++) begin
+        big_obj = dpi_yaml_set_int(big_obj, $sformatf("key%0d", i), i);
+      end
+      check_int("stress: 50-key object size", dpi_yaml_size(big_obj), 50);
+
+      // Deep nesting (10 levels)
+      deep_h = dpi_yaml_parse("l1:\n  l2:\n    l3:\n      l4:\n        l5:\n          l6:\n            l7:\n              l8:\n                l9:\n                  l10: 42");
+      check_int("stress: 10-level deep", dpi_yaml_as_int(dpi_yaml_at_path(deep_h, "/l1/l2/l3/l4/l5/l6/l7/l8/l9/l10")), 42);
+
+      // Long string
+      long_str = "";
+      for (int i = 0; i < 100; i++) long_str = {long_str, "abcdefghij"};
+      begin
+        int ls_h;
+        ls_h = dpi_yaml_create_string(long_str);
+        check_int("stress: long string len", dpi_yaml_as_string(ls_h).len(), 1000);
+      end
     end
 
     $display("\nBasic tests: %0d passed, %0d failed", pass_count, fail_count);

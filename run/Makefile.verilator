@@ -1,8 +1,8 @@
 VERILATOR ?= verilator
-VERILATOR_FLAGS = --cc --exe --build -Wall -Wno-DECLFILENAME
+VERILATOR_FLAGS = --cc --exe --build -Wall -Wno-DECLFILENAME -I$(abspath tests)
 
-JSON_CFLAGS = -std=c++14 -Isv_json/src/dpi
-YAML_CFLAGS = -std=c++14 -Isv_yaml/src/dpi
+JSON_CFLAGS = -std=c++14 -I$(abspath sv_json/src/dpi) -I$(abspath sv_serde/src/dpi)
+YAML_CFLAGS = -std=c++14 -I$(abspath sv_yaml/src/dpi) -I$(abspath sv_serde/src/dpi)
 
 DPI_SRC = sv_json/src/dpi/sv_json_dpi.cc
 TEST_SV = sv_json/tests/sv_json_test.sv

@@ -1,18 +1,11 @@
 #ifndef SV_YAML_DPI_H
 #define SV_YAML_DPI_H
 
+#include "serde_common.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-// Type codes (must match sv_yaml_type_e enum in sv_yaml_pkg.sv)
-#define SV_YAML_TYPE_NULL    0
-#define SV_YAML_TYPE_BOOL    1
-#define SV_YAML_TYPE_INT     2
-#define SV_YAML_TYPE_FLOAT   3
-#define SV_YAML_TYPE_STRING  4
-#define SV_YAML_TYPE_ARRAY   5
-#define SV_YAML_TYPE_OBJECT  6
 
 // Object lifecycle
 int dpi_yaml_new_object(void);

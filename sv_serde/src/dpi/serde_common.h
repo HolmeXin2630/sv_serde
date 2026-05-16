@@ -1,0 +1,31 @@
+#ifndef SERDE_COMMON_H
+#define SERDE_COMMON_H
+
+// Shared type codes for JSON and YAML backends.
+// Must match sv_json_type_e / sv_yaml_type_e enums in SV packages.
+#define SERDE_TYPE_NULL    0
+#define SERDE_TYPE_BOOL    1
+#define SERDE_TYPE_INT     2
+#define SERDE_TYPE_FLOAT   3
+#define SERDE_TYPE_STRING  4
+#define SERDE_TYPE_ARRAY   5
+#define SERDE_TYPE_OBJECT  6
+
+// Backward-compatible aliases
+#define SV_JSON_TYPE_NULL    SERDE_TYPE_NULL
+#define SV_JSON_TYPE_BOOL    SERDE_TYPE_BOOL
+#define SV_JSON_TYPE_INT     SERDE_TYPE_INT
+#define SV_JSON_TYPE_FLOAT   SERDE_TYPE_FLOAT
+#define SV_JSON_TYPE_STRING  SERDE_TYPE_STRING
+#define SV_JSON_TYPE_ARRAY   SERDE_TYPE_ARRAY
+#define SV_JSON_TYPE_OBJECT  SERDE_TYPE_OBJECT
+
+#define SV_YAML_TYPE_NULL    SERDE_TYPE_NULL
+#define SV_YAML_TYPE_BOOL    SERDE_TYPE_BOOL
+#define SV_YAML_TYPE_INT     SERDE_TYPE_INT
+#define SV_YAML_TYPE_FLOAT   SERDE_TYPE_FLOAT
+#define SV_YAML_TYPE_STRING  SERDE_TYPE_STRING
+#define SV_YAML_TYPE_ARRAY   SERDE_TYPE_ARRAY
+#define SV_YAML_TYPE_OBJECT  SERDE_TYPE_OBJECT
+
+#endif // SERDE_COMMON_H
