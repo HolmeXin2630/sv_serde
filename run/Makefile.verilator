@@ -4,6 +4,8 @@ VERILATOR_FLAGS = --binary --build -Wno-WIDTH -Wno-CASEINCOMPLETE -Wno-UNOPTFLAT
 JSON_CFLAGS = -std=c++14 -I$(abspath sv_json/src/dpi) -I$(abspath sv_serde/src/dpi)
 YAML_CFLAGS = -std=c++14 -I$(abspath sv_yaml/src/dpi) -I$(abspath sv_serde/src/dpi)
 
+SERDE_DPI = sv_serde/src/dpi/serde_common.cc
+
 JSON_PKG = sv_json/src/sv_json_pkg.sv
 JSON_DPI = sv_json/src/dpi/sv_json_dpi.cc
 JSON_TEST = tests/test_json_class.sv
@@ -24,6 +26,7 @@ run_test_json:
 		$(JSON_PKG) \
 		$(JSON_TEST) \
 		$(JSON_DPI) \
+		$(SERDE_DPI) \
 		--top-module $(JSON_TOP) \
 		--Mdir $(JSON_OBJ_DIR) \
 		-o test_json_class
@@ -35,6 +38,7 @@ run_test_yaml:
 		$(YAML_PKG) \
 		$(YAML_TEST) \
 		$(YAML_DPI) \
+		$(SERDE_DPI) \
 		--top-module $(YAML_TOP) \
 		--Mdir $(YAML_OBJ_DIR) \
 		-o test_yaml_class

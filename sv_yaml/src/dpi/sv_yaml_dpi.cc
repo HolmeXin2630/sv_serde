@@ -53,8 +53,7 @@ static_assert(YamlNode::MAP_VAL    == SERDE_TYPE_OBJECT, "MAP_VAL mismatch");
 static std::unordered_map<int, YamlNode> g_handles;
 static int g_next_handle = 1;
 
-// Error reporting — g_last_error is written by SET_ERROR() macro, read by dpi_serde_last_error()
-thread_local std::string g_last_error;
+// Error reporting — now provided by serde_common.cc
 
 static int alloc_handle(const YamlNode& n) {
     int h = g_next_handle++;

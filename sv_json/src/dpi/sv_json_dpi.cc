@@ -7,11 +7,6 @@
 
 using json = nlohmann::json;
 
-// Error state — referenced by serde::set_error() in serde_common.h
-namespace serde {
-thread_local std::string g_last_error;
-}
-
 // Handle table
 static std::unordered_map<int, json> g_handles;
 static int g_next_handle = 1;
@@ -49,12 +44,6 @@ static const char* return_str(const std::string& s) {
 }
 
 extern "C" {
-
-// === Error reporting ===
-
-const char* dpi_serde_last_error() {
-    return serde::g_last_error.c_str();
-}
 
 // === Lifecycle ===
 
