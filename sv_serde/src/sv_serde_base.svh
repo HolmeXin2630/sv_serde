@@ -17,12 +17,17 @@ virtual class sv_serde_base;
   protected static bit s_default_strict_mode = 0;
 
   // -----------------------------------------------------------------------
-  // Constructor
+  // Constructor (no-arg, then init() — Verilator-compatible two-phase init)
   // -----------------------------------------------------------------------
-  protected function new(int handle, sv_serde_type_e serde_type);
+  protected function new();
+    m_handle = 0;
+    m_type = SERDE_NULL;
+    m_strict_mode = s_default_strict_mode;
+  endfunction
+
+  protected function void init(int handle, sv_serde_type_e serde_type);
     m_handle = handle;
     m_type = serde_type;
-    m_strict_mode = s_default_strict_mode;
   endfunction
 
   // -----------------------------------------------------------------------
