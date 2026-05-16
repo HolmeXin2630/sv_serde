@@ -117,6 +117,26 @@ vcs -full64 -sverilog \
     -o simv
 ```
 
+**Using pre-built shared libraries (faster, no C++ compilation):**
+
+```bash
+# JSON only
+vcs -full64 -sverilog \
+    sv_json/src/sv_json_pkg.sv your_test.sv \
+    -LDFLAGS "sv_json/src/dpi/libsv_json.so -Wl,-rpath,sv_json/src/dpi" \
+    -o simv
+
+# JSON + YAML
+vcs -full64 -sverilog \
+    sv_json/src/sv_json_pkg.sv \
+    sv_yaml/src/sv_yaml_pkg.sv \
+    your_test.sv \
+    -LDFLAGS "sv_json/src/dpi/libsv_json.so sv_yaml/src/dpi/libsv_yaml.so -Wl,-rpath,sv_json/src/dpi:sv_yaml/src/dpi" \
+    -o simv
+```
+
+> **Note:** Shared libraries (`.so`) are pre-built for Linux x86_64 and stored via git-lfs. Rebuild with `make -f run/Makefile.vcs build_so` if needed.
+
 ### Xcelium
 
 ```bash
@@ -128,12 +148,25 @@ xrun -sv \
 ### Verilator (testing only)
 
 ```bash
-make -f run/Makefile.verilator run_test_json   # JSON SV API tests (51 tests)
-make -f run/Makefile.verilator run_test_yaml   # YAML SV API tests (62 tests)
-make -f run/Makefile.verilator run_test_all    # All SV API tests (113 tests)
+make -f run/Makefile.verilator run_test_json     # JSON SV API tests (64 tests)
+make -f run/Makefile.verilator run_test_yaml     # YAML SV API tests (75 tests)
+make -f run/Makefile.verilator run_test_all      # All tests (164 tests)
 ```
 
-> **Note:** The Verilator test flow now exercises the public SystemVerilog API directly by importing packages and calling `sv_json`/`sv_yaml` methods.
+### VCS Testing
+
+```bash
+# With C++ compilation (original)
+make -f run/Makefile.vcs run_test_json
+make -f run/Makefile.vcs run_test_yaml
+
+# With pre-built shared libraries (faster)
+make -f run/Makefile.vcs run_test_json_so
+make -f run/Makefile.vcs run_test_yaml_so
+
+# Rebuild shared libraries
+make -f run/Makefile.vcs build_so
+```
 
 ## API Reference
 

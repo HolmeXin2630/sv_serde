@@ -117,6 +117,26 @@ vcs -full64 -sverilog \
     -o simv
 ```
 
+**使用预编译共享库（更快，无需编译 C++）：**
+
+```bash
+# 仅 JSON
+vcs -full64 -sverilog \
+    sv_json/src/sv_json_pkg.sv your_test.sv \
+    -LDFLAGS "sv_json/src/dpi/libsv_json.so -Wl,-rpath,sv_json/src/dpi" \
+    -o simv
+
+# JSON + YAML
+vcs -full64 -sverilog \
+    sv_json/src/sv_json_pkg.sv \
+    sv_yaml/src/sv_yaml_pkg.sv \
+    your_test.sv \
+    -LDFLAGS "sv_json/src/dpi/libsv_json.so sv_yaml/src/dpi/libsv_yaml.so -Wl,-rpath,sv_json/src/dpi:sv_yaml/src/dpi" \
+    -o simv
+```
+
+> **注意：** 共享库（`.so`）为 Linux x86_64 预编译，通过 git-lfs 存储。如需重新编译，运行 `make -f run/Makefile.vcs build_so`。
+
 ### Xcelium
 
 ```bash
@@ -128,12 +148,25 @@ xrun -sv \
 ### Verilator（仅用于测试）
 
 ```bash
-make -f run/Makefile.verilator run_test_json   # JSON 的 SV API 测试（51 个）
-make -f run/Makefile.verilator run_test_yaml   # YAML 的 SV API 测试（62 个）
-make -f run/Makefile.verilator run_test_all    # 全部 SV API 测试（113 个）
+make -f run/Makefile.verilator run_test_json     # JSON 的 SV API 测试（64 个）
+make -f run/Makefile.verilator run_test_yaml     # YAML 的 SV API 测试（75 个）
+make -f run/Makefile.verilator run_test_all      # 全部测试（164 个）
 ```
 
-> **注意：** 当前 Verilator 测试流程会直接导入 package，并调用 `sv_json`/`sv_yaml` 的公开 SystemVerilog API。
+### VCS 测试
+
+```bash
+# 使用 C++ 编译（原始方式）
+make -f run/Makefile.vcs run_test_json
+make -f run/Makefile.vcs run_test_yaml
+
+# 使用预编译共享库（更快）
+make -f run/Makefile.vcs run_test_json_so
+make -f run/Makefile.vcs run_test_yaml_so
+
+# 重新编译共享库
+make -f run/Makefile.vcs build_so
+```
 
 ## API 参考
 

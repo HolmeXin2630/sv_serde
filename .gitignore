@@ -33,6 +33,10 @@ waves.shm/
 *.log
 *.key
 
+# Pre-built shared libraries (tracked via git-lfs)
+!sv_json/src/dpi/libsv_json.so
+!sv_yaml/src/dpi/libsv_yaml.so
+
 # Test output
 sv_json/tests/data/out_*.json
 sv_yaml/tests/data/out_*.yaml

@@ -11,12 +11,14 @@ SERDE_DPI = sv_serde/src/dpi/serde_common.cc
 
 JSON_PKG = sv_json/src/sv_json_pkg.sv
 JSON_DPI = sv_json/src/dpi/sv_json_dpi.cc
+JSON_SO = sv_json/src/dpi/libsv_json.so
 JSON_TEST = tests/test_json_class.sv
 JSON_TOP = test_json_class
 JSON_BIN = simv_json
 
 YAML_PKG = sv_yaml/src/sv_yaml_pkg.sv
 YAML_DPI = sv_yaml/src/dpi/sv_yaml_dpi.cc
+YAML_SO = sv_yaml/src/dpi/libsv_yaml.so
 YAML_TEST = tests/test_yaml_class.sv
 YAML_TOP = test_yaml_class
 YAML_BIN = simv_yaml
@@ -26,7 +28,7 @@ UNIFIED_TEST = tests/test_serde_unified.sv
 UNIFIED_TOP = test_serde_unified
 UNIFIED_BIN = simv_unified
 
-.PHONY: run_test_json run_test_yaml run_test_all clean
+.PHONY: run_test_json run_test_yaml run_test_json_so run_test_yaml_so run_test_all build_so clean
 
 run_test_json:
 	$(VCS) $(VCS_FLAGS) -CFLAGS "$(JSON_CFLAGS)" \
@@ -65,6 +67,42 @@ run_test_unified:
 		-o $(UNIFIED_BIN) \
 		-l vcs_unified.log
 	./$(UNIFIED_BIN)
+
+# Shared library targets
+build_json_so:
+	g++ -shared -fPIC -std=c++14 \
+		-I$(abspath sv_json/src/dpi) -I$(abspath sv_serde/src/dpi) \
+		-o $(JSON_SO) $(JSON_DPI) $(SERDE_DPI)
+
+build_yaml_so:
+	g++ -shared -fPIC -std=c++14 \
+		-I$(abspath sv_yaml/src/dpi) -I$(abspath sv_serde/src/dpi) \
+		-o $(YAML_SO) $(YAML_DPI) $(SERDE_DPI)
+
+build_so: build_json_so build_yaml_so
+
+# VCS with pre-built shared libraries (no CFLAGS needed)
+run_test_json_so:
+	$(VCS) $(VCS_FLAGS) \
+		$(SERDE_PKG) \
+		$(JSON_PKG) \
+		$(JSON_TEST) \
+		-LDFLAGS "$(abspath $(JSON_SO)) -Wl,-rpath,$(abspath $(dir $(JSON_SO)))" \
+		-top $(JSON_TOP) \
+		-o $(JSON_BIN)_so \
+		-l vcs_json_so.log
+	./$(JSON_BIN)_so
+
+run_test_yaml_so:
+	$(VCS) $(VCS_FLAGS) \
+		$(SERDE_PKG) \
+		$(YAML_PKG) \
+		$(YAML_TEST) \
+		-LDFLAGS "$(abspath $(YAML_SO)) -Wl,-rpath,$(abspath $(dir $(YAML_SO)))" \
+		-top $(YAML_TOP) \
+		-o $(YAML_BIN)_so \
+		-l vcs_yaml_so.log
+	./$(YAML_BIN)_so
 
 run_test_all:
 	$(MAKE) -f $(lastword $(MAKEFILE_LIST)) run_test_json
