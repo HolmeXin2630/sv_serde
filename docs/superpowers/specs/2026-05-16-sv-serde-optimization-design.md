@@ -33,7 +33,7 @@
 - 4 个 `value_*()` 带默认值方法
 - 7 个结构体访问器：`get`、`at`、`at_path`、`contains`、`empty`、`size`、`key_at`、`get_keys`
 - 6 个修改方法：`set`、`push`、`insert_at`、`remove`、`remove_at`、`update`
-- `dump`、`dump_file`、`clone`、`is_valid`
+- `dump`、`dump_file`、`clone`、`is_valid`、`destroy`
 - `set_strict_mode(bit enable)` 实例方法
 - `set_default_strict_mode(bit enable)` 静态方法
 - `last_error()` 查询最近错误
@@ -69,6 +69,7 @@ pure virtual function int    dpi_as_bool(int h);
 pure virtual function string dpi_dump(int h, int indent);
 pure virtual function int    dpi_dump_file(int h, string fname, int indent);
 pure virtual function int    dpi_clone(int h);
+pure virtual function void   dpi_destroy(int h);
 pure virtual function int    dpi_is_valid(int h);
 pure virtual function string dpi_last_error();
 ```
@@ -82,6 +83,45 @@ pure virtual function string dpi_last_error();
 - YAML 特有方法（10 个）
 
 文件从 331/356 行缩减到各约 100 行。
+
+### 内存管理与 `destroy()`
+
+**问题**：C++ 全局句柄表只增不减，`dpi_json_destroy`/`dpi_json_free` 虽已 import 但未暴露给用户。大量大文件场景下内存持续膨胀。
+
+**约束**：SystemVerilog 没有析构函数，无法在对象被 GC 回收时自动触发 C++ 侧内存释放。这是语言层面的限制，所有 SV DPI 库的标准做法是提供手动释放方法。
+
+**方案**：基类暴露 `destroy()`，用户显式调用释放 C++ 侧内存。
+
+```systemverilog
+// sv_serde_base
+function void destroy();
+    dpi_destroy(m_handle);  // virtual → dpi_json_destroy / dpi_yaml_free
+    m_handle = 0;
+endfunction
+```
+
+**使用模式**——批量大文件场景：
+
+```systemverilog
+for (int i = 0; i < 1000; i++) begin
+    sv_json j = sv_json::parse(read_large_file(i));
+    // ... 使用 j ...
+    j.destroy();  // 立即释放 C++ 侧内存
+end
+```
+
+**不可变语义下的注意事项**：链式操作产生多个中间版本，每个都占用独立 C++ 内存，需要逐一释放：
+
+```systemverilog
+sv_json a = sv_json::parse(big);   // handle=5
+sv_json b = a.set("x", v);         // handle=7（深拷贝新对象）
+sv_json c = b.remove("y");         // handle=9（深拷贝新对象）
+a.destroy();  // 释放 handle=5
+b.destroy();  // 释放 handle=7
+// c 继续使用 handle=9
+```
+
+**安全性**：`destroy()` 后 `m_handle` 置为 0，后续对已销毁对象的方法调用将返回 null/0/""（通过 null handle 检测机制），不会出现悬空指针未定义行为。
 
 ---
 
@@ -173,11 +213,27 @@ endclass
 
 ### 5b. g_strings 有界化
 
-限制全局字符串缓存表最大条目数（10000），超过后清除最早条目：
+**安全性**：SV 仿真器在 DPI 调用返回瞬间将 C 字符串拷贝为 SV 自己的 `string` 对象。`g_strings` 只在 DPI 返回的极短窗口内被读取，清除旧条目不影响 SV 侧已持有的数据。
+
+**策略**：`g_next_str_id` 单调递增，最新条目 ID 最大。超过阈值时清除 ID 较小的一半（最早条目），确保刚存入的新条目不受影响：
 
 ```cpp
 static const size_t MAX_STRINGS = 10000;
-// 超过阈值时清除最早一半条目
+
+static const char* return_str(const std::string& s) {
+    int id = g_next_str_id++;
+    g_strings[id] = s;
+    if (g_strings.size() > MAX_STRINGS) {
+        int threshold = g_next_str_id - MAX_STRINGS / 2;
+        for (auto it = g_strings.begin(); it != g_strings.end(); ) {
+            if (it->first < threshold)
+                it = g_strings.erase(it);
+            else
+                ++it;
+        }
+    }
+    return g_strings[id].c_str();
+}
 ```
 
 ### 5c. C++ 句柄表线程保护（可选）
@@ -211,6 +267,7 @@ VCS/Xcelium 多线程仿真模式下，对 `g_handles` 和 `g_strings` 的操作
 ## 接口兼容性
 
 - 所有 public API 保持不变（方法签名、调用方式不变）
+- 新增 `destroy()` 方法，用于显式释放 C++ 侧内存（SV 语言限制，无析构函数）
 - 类型枚举别名保持向后兼容（`sv_json_type_e` 可通过 typedef 指向 `sv_serde_type_e`）
 - `set_strict_mode` 从包级静态改为实例方法，原有静态调用方式需要改为 `sv_json::set_default_strict_mode(1)` 或对象方法
 - `strict_mode` 包级变量删除，直接引用需迁移
