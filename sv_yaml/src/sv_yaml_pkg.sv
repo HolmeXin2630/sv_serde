@@ -103,38 +103,38 @@ package sv_yaml_pkg;
     endfunction
 
     // --- DPI dispatch virtual overrides (one-liner delegates) ---
-    function int   dpi_parse(string s);           return dpi_yaml_parse(s);           endfunction
+    function int   dpi_parse(string input_str);   return dpi_yaml_parse(input_str);   endfunction
     function int   dpi_new_object();              return dpi_yaml_new_object();       endfunction
     function int   dpi_new_array();               return dpi_yaml_new_array();        endfunction
-    function int   dpi_create_string(string v);   return dpi_yaml_create_string(v);   endfunction
-    function int   dpi_create_int_val(int v);     return dpi_yaml_create_int_val(v);  endfunction
-    function int   dpi_create_float_val(real v);  return dpi_yaml_create_float_val(v);endfunction
-    function int   dpi_create_bool_val(int v);    return dpi_yaml_create_bool_val(v); endfunction
+    function int   dpi_create_string(string val); return dpi_yaml_create_string(val); endfunction
+    function int   dpi_create_int_val(int val);   return dpi_yaml_create_int_val(val);endfunction
+    function int   dpi_create_float_val(real val); return dpi_yaml_create_float_val(val);endfunction
+    function int   dpi_create_bool_val(int val);  return dpi_yaml_create_bool_val(val); endfunction
     function int   dpi_create_null();             return dpi_yaml_create_null();      endfunction
-    function int   dpi_get(int h, string k);      return dpi_yaml_get(h, k);          endfunction
-    function int   dpi_at(int h, int i);          return dpi_yaml_at(h, i);           endfunction
-    function int   dpi_at_path(int h, string p);  return dpi_yaml_at_path(h, p);      endfunction
-    function int   dpi_contains(int h, string k); return dpi_yaml_contains(h, k);     endfunction
+    function int   dpi_get(int h, string key);    return dpi_yaml_get(h, key);        endfunction
+    function int   dpi_at(int h, int idx);        return dpi_yaml_at(h, idx);         endfunction
+    function int   dpi_at_path(int h, string path); return dpi_yaml_at_path(h, path);   endfunction
+    function int   dpi_contains(int h, string key); return dpi_yaml_contains(h, key);  endfunction
     function int   dpi_empty(int h);              return dpi_yaml_empty(h);           endfunction
     function int   dpi_size(int h);               return dpi_yaml_size(h);            endfunction
-    function string dpi_key_at(int h, int i);     return dpi_yaml_key_at(h, i);       endfunction
-    function int    dpi_set(int h, string k, int v);       return dpi_yaml_set(h, k, v);       endfunction
-    function int    dpi_push(int h, int v);               return dpi_yaml_push(h, v);          endfunction
-    function int    dpi_insert_at(int h, int i, int v);   return dpi_yaml_insert_at(h, i, v);  endfunction
-    function int    dpi_remove(int h, string k);          return dpi_yaml_remove(h, k);        endfunction
-    function int    dpi_remove_at(int h, int i);          return dpi_yaml_remove_at(h, i);     endfunction
-    function int    dpi_update(int h, int o);             return dpi_yaml_update(h, o);        endfunction
-    function int    dpi_set_string(int h, string k, string v); return dpi_yaml_set_string(h, k, v); endfunction
-    function int    dpi_set_int(int h, string k, int v);      return dpi_yaml_set_int(h, k, v);      endfunction
-    function int    dpi_set_float(int h, string k, real v);   return dpi_yaml_set_float(h, k, v);    endfunction
-    function int    dpi_set_bool(int h, string k, int v);     return dpi_yaml_set_bool(h, k, v);     endfunction
-    function int    dpi_set_null(int h, string k);            return dpi_yaml_set_null(h, k);        endfunction
+    function string dpi_key_at(int h, int idx);   return dpi_yaml_key_at(h, idx);     endfunction
+    function int    dpi_set(int h, string key, int val_h);  return dpi_yaml_set(h, key, val_h); endfunction
+    function int    dpi_push(int h, int val_h);            return dpi_yaml_push(h, val_h);     endfunction
+    function int    dpi_insert_at(int h, int idx, int val_h); return dpi_yaml_insert_at(h, idx, val_h); endfunction
+    function int    dpi_remove(int h, string key);       return dpi_yaml_remove(h, key);     endfunction
+    function int    dpi_remove_at(int h, int idx);       return dpi_yaml_remove_at(h, idx);  endfunction
+    function int    dpi_update(int h, int other_h);      return dpi_yaml_update(h, other_h); endfunction
+    function int    dpi_set_string(int h, string key, string value); return dpi_yaml_set_string(h, key, value); endfunction
+    function int    dpi_set_int(int h, string key, int value);   return dpi_yaml_set_int(h, key, value);   endfunction
+    function int    dpi_set_float(int h, string key, real value); return dpi_yaml_set_float(h, key, value); endfunction
+    function int    dpi_set_bool(int h, string key, int value);  return dpi_yaml_set_bool(h, key, value);  endfunction
+    function int    dpi_set_null(int h, string key);            return dpi_yaml_set_null(h, key);     endfunction
     function string dpi_as_string(int h);     return dpi_yaml_as_string(h);     endfunction
     function int    dpi_as_int(int h);         return dpi_yaml_as_int(h);       endfunction
     function real   dpi_as_real(int h);        return dpi_yaml_as_real(h);      endfunction
     function int    dpi_as_bool(int h);        return dpi_yaml_as_bool(h);      endfunction
-    function string dpi_dump(int h, int i);    return dpi_yaml_dump(h, i);      endfunction
-    function int    dpi_dump_file(int h, string f, int i); return dpi_yaml_dump_file(h, f, i); endfunction
+    function string dpi_dump(int h, int indent);  return dpi_yaml_dump(h, indent);    endfunction
+    function int    dpi_dump_file(int h, string fname, int indent); return dpi_yaml_dump_file(h, fname, indent); endfunction
     function int    dpi_clone(int h);          return dpi_yaml_clone(h);        endfunction
     function void   dpi_destroy(int h);        dpi_yaml_free(h);               endfunction
     function int    dpi_is_valid(int h);       return dpi_yaml_is_valid(h);    endfunction
