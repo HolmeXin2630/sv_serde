@@ -53,6 +53,9 @@ static_assert(YamlNode::MAP_VAL    == SERDE_TYPE_OBJECT, "MAP_VAL mismatch");
 static std::unordered_map<int, YamlNode> g_handles;
 static int g_next_handle = 1;
 
+// Error reporting — g_last_error is written by SET_ERROR() macro, read by dpi_serde_last_error()
+thread_local std::string g_last_error;
+
 static int alloc_handle(const YamlNode& n) {
     int h = g_next_handle++;
     g_handles[h] = n;
@@ -70,9 +73,20 @@ static const YamlNode* get_node(int h) {
 static std::unordered_map<int, std::string> g_strings;
 static int g_next_str_id = 1;
 
+static const size_t MAX_STRINGS = 10000;
+
 static const char* return_str(const std::string& s) {
     int id = g_next_str_id++;
     g_strings[id] = s;
+    if (g_strings.size() > MAX_STRINGS) {
+        int threshold = g_next_str_id - MAX_STRINGS / 2;
+        for (auto it = g_strings.begin(); it != g_strings.end(); ) {
+            if (it->first < threshold)
+                it = g_strings.erase(it);
+            else
+                ++it;
+        }
+    }
     return g_strings[id].c_str();
 }
 
@@ -398,13 +412,17 @@ static int try_parse_yaml_content(const std::string& content) {
         }
         // Scalar parsed successfully but could be a file path — signal to try file
         return -1;
+    } catch (const std::exception& e) {
+        SET_ERROR("YAML parse error: %s", e.what());
+        return 0;
     } catch (...) {
+        SET_ERROR("YAML parse error: unknown exception");
         return 0;
     }
 }
 
 static int parse_yaml_input(const char* input) {
-    if (!input) return 0;
+    if (!input) { SET_ERROR("null input"); return 0; }
     std::string content(input);
 
     // First: try parsing as YAML content (non-scalar only)
@@ -425,7 +443,11 @@ static int parse_yaml_input(const char* input) {
         c4::csubstr cs = c4::to_csubstr(content);
         ryml_ns::Tree tree = ryml_ns::parse_in_arena(cs);
         return ryml_to_handle(tree, tree.root_id());
-    } catch (...) {}
+    } catch (const std::exception& e) {
+        SET_ERROR("YAML parse error: %s", e.what());
+    } catch (...) {
+        SET_ERROR("YAML parse error: unknown exception");
+    }
     return 0;
 }
 
@@ -461,7 +483,7 @@ void dpi_yaml_destroy(int handle) {
 
 int dpi_yaml_get_type(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return -1;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return -1; }
     return (int)n->type;  // Enum values match SERDE_TYPE_* macros
 }
 
@@ -469,7 +491,7 @@ int dpi_yaml_get_type(int h) {
 
 const char* dpi_yaml_as_string(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return "";
+    if (!n) { SET_ERROR("invalid handle: %d", h); return ""; }
     switch (n->type) {
         case YamlNode::STRING_VAL:  return return_str(n->str_val);
         case YamlNode::INT_VAL:     return return_str(std::to_string(n->int_val));
@@ -486,7 +508,7 @@ const char* dpi_yaml_as_string(int h) {
 
 int dpi_yaml_as_int(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
     switch (n->type) {
         case YamlNode::INT_VAL:   return n->int_val;
         case YamlNode::REAL_VAL:  return (int)n->real_val;
@@ -497,7 +519,7 @@ int dpi_yaml_as_int(int h) {
 
 double dpi_yaml_as_real(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return 0.0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0.0; }
     switch (n->type) {
         case YamlNode::REAL_VAL:  return n->real_val;
         case YamlNode::INT_VAL:   return (double)n->int_val;
@@ -507,7 +529,7 @@ double dpi_yaml_as_real(int h) {
 
 int dpi_yaml_as_bool(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
     switch (n->type) {
         case YamlNode::BOOL_VAL:  return n->bool_val ? 1 : 0;
         case YamlNode::INT_VAL:   return n->int_val ? 1 : 0;
@@ -556,7 +578,7 @@ int dpi_yaml_create_null(void) {
 
 int dpi_yaml_clone(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
     return alloc_handle(*n);
 }
 
@@ -572,32 +594,42 @@ int dpi_yaml_is_valid(int h) {
 
 int dpi_yaml_get(int h, const char* key) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    if (!n || n->type != YamlNode::MAP_VAL || !key) {
+        if (!n) SET_ERROR("invalid handle: %d", h);
+        else if (n->type != YamlNode::MAP_VAL) SET_ERROR("expected object for get('%s')", key ? key : "(null)");
+        return 0;
+    }
     for (auto& p : n->map_children) {
         if (p.first == key) {
             const YamlNode* child = get_node(p.second);
-            if (!child) return 0;
+            if (!child) { SET_ERROR("dangling child handle: %d in key '%s'", p.second, key); return 0; }
             return alloc_handle(*child);  // deep copy
         }
     }
+    SET_ERROR("key '%s' not found", key);
     return 0;
 }
 
 int dpi_yaml_at(int h, int idx) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::SEQ_VAL) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::SEQ_VAL) { SET_ERROR("expected array for at(%d)", idx); return 0; }
     if (idx >= 0 && idx < (int)n->seq_children.size()) {
         const YamlNode* child = get_node(n->seq_children[idx]);
-        if (!child) return 0;
+        if (!child) { SET_ERROR("dangling child handle: %d at index %d", n->seq_children[idx], idx); return 0; }
         return alloc_handle(*child);  // deep copy
     }
+    SET_ERROR("index %d out of range (size=%zu)", idx, n->seq_children.size());
     return 0;
 }
 
 int dpi_yaml_at_path(int h, const char* path) {
-    if (!path) return 0;
+    if (!path) { SET_ERROR("null path"); return 0; }
     std::string p(path);
-    if (p.empty() || p[0] != '/') return 0;
+    if (p.empty() || p[0] != '/') { SET_ERROR("invalid path: '%s'", path); return 0; }
+
+    const YamlNode* root_n = get_node(h);
+    if (!root_n) { SET_ERROR("invalid handle: %d", h); return 0; }
 
     int current = h;
     size_t pos = 1;
@@ -613,7 +645,7 @@ int dpi_yaml_at_path(int h, const char* path) {
             segment.replace(tilde, 2, "~");
 
         const YamlNode* cur = get_node(current);
-        if (!cur) return 0;
+        if (!cur) { SET_ERROR("invalid handle at path segment '%s'", segment.c_str()); return 0; }
 
         if (cur->type == YamlNode::MAP_VAL) {
             current = dpi_yaml_get(current, segment.c_str());
@@ -621,10 +653,11 @@ int dpi_yaml_at_path(int h, const char* path) {
             int idx = atoi(segment.c_str());
             current = dpi_yaml_at(current, idx);
         } else {
+            SET_ERROR("cannot traverse scalar at path segment '%s'", segment.c_str());
             return 0;
         }
 
-        if (current == 0) return 0;
+        if (current == 0) { SET_ERROR("path traversal failed at '%s'", segment.c_str()); return 0; }
         if (next == std::string::npos) break;
         pos = next + 1;
     }
@@ -667,8 +700,10 @@ const char* dpi_yaml_key_at(int h, int idx) {
 
 int dpi_yaml_set(int h, const char* key, int val_h) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
-    if (!get_node(val_h)) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for set('%s')", key ? key : "(null)"); return 0; }
+    if (!key) { SET_ERROR("null key"); return 0; }
+    if (!get_node(val_h)) { SET_ERROR("invalid value handle: %d", val_h); return 0; }
     YamlNode new_node = *n;
     bool found = false;
     for (auto& p : new_node.map_children) {
@@ -684,8 +719,9 @@ int dpi_yaml_set(int h, const char* key, int val_h) {
 
 int dpi_yaml_push(int h, int val_h) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::SEQ_VAL) return 0;
-    if (!get_node(val_h)) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::SEQ_VAL) { SET_ERROR("expected array for push()"); return 0; }
+    if (!get_node(val_h)) { SET_ERROR("invalid value handle: %d", val_h); return 0; }
     YamlNode new_node = *n;
     new_node.seq_children.push_back(val_h);
     return alloc_handle(new_node);
@@ -693,9 +729,10 @@ int dpi_yaml_push(int h, int val_h) {
 
 int dpi_yaml_insert_at(int h, int idx, int val_h) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::SEQ_VAL) return 0;
-    if (!get_node(val_h)) return 0;
-    if (idx < 0 || idx > (int)n->seq_children.size()) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::SEQ_VAL) { SET_ERROR("expected array for insert_at(%d)", idx); return 0; }
+    if (!get_node(val_h)) { SET_ERROR("invalid value handle: %d", val_h); return 0; }
+    if (idx < 0 || idx > (int)n->seq_children.size()) { SET_ERROR("index %d out of range (size=%zu)", idx, n->seq_children.size()); return 0; }
     YamlNode new_node = *n;
     new_node.seq_children.insert(new_node.seq_children.begin() + idx, val_h);
     return alloc_handle(new_node);
@@ -703,7 +740,9 @@ int dpi_yaml_insert_at(int h, int idx, int val_h) {
 
 int dpi_yaml_remove(int h, const char* key) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for remove('%s')", key ? key : "(null)"); return 0; }
+    if (!key) { SET_ERROR("null key"); return 0; }
     YamlNode new_node = *n;
     new_node.map_children.erase(
         std::remove_if(new_node.map_children.begin(), new_node.map_children.end(),
@@ -714,8 +753,9 @@ int dpi_yaml_remove(int h, const char* key) {
 
 int dpi_yaml_remove_at(int h, int idx) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::SEQ_VAL) return 0;
-    if (idx < 0 || idx >= (int)n->seq_children.size()) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::SEQ_VAL) { SET_ERROR("expected array for remove_at(%d)", idx); return 0; }
+    if (idx < 0 || idx >= (int)n->seq_children.size()) { SET_ERROR("index %d out of range (size=%zu)", idx, n->seq_children.size()); return 0; }
     YamlNode new_node = *n;
     new_node.seq_children.erase(new_node.seq_children.begin() + idx);
     return alloc_handle(new_node);
@@ -724,8 +764,10 @@ int dpi_yaml_remove_at(int h, int idx) {
 int dpi_yaml_update(int h, int other_h) {
     const YamlNode* n = get_node(h);
     const YamlNode* o = get_node(other_h);
-    if (!n || n->type != YamlNode::MAP_VAL) return 0;
-    if (!o || o->type != YamlNode::MAP_VAL) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for update()"); return 0; }
+    if (!o) { SET_ERROR("invalid other handle: %d", other_h); return 0; }
+    if (o->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for update() source"); return 0; }
     YamlNode new_node = *n;
     for (auto& p : o->map_children) {
         bool found = false;
@@ -745,7 +787,9 @@ int dpi_yaml_update(int h, int other_h) {
 
 int dpi_yaml_set_string(int h, const char* key, const char* value) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for set_string('%s')", key ? key : "(null)"); return 0; }
+    if (!key) { SET_ERROR("null key"); return 0; }
     YamlNode new_node = *n;
     YamlNode val_node;
     val_node.type = YamlNode::STRING_VAL;
@@ -765,7 +809,9 @@ int dpi_yaml_set_string(int h, const char* key, const char* value) {
 
 int dpi_yaml_set_int(int h, const char* key, int value) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for set_int('%s')", key ? key : "(null)"); return 0; }
+    if (!key) { SET_ERROR("null key"); return 0; }
     YamlNode new_node = *n;
     YamlNode val_node;
     val_node.type = YamlNode::INT_VAL;
@@ -785,7 +831,9 @@ int dpi_yaml_set_int(int h, const char* key, int value) {
 
 int dpi_yaml_set_float(int h, const char* key, double value) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for set_float('%s')", key ? key : "(null)"); return 0; }
+    if (!key) { SET_ERROR("null key"); return 0; }
     YamlNode new_node = *n;
     YamlNode val_node;
     val_node.type = YamlNode::REAL_VAL;
@@ -805,7 +853,9 @@ int dpi_yaml_set_float(int h, const char* key, double value) {
 
 int dpi_yaml_set_bool(int h, const char* key, int value) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for set_bool('%s')", key ? key : "(null)"); return 0; }
+    if (!key) { SET_ERROR("null key"); return 0; }
     YamlNode new_node = *n;
     YamlNode val_node;
     val_node.type = YamlNode::BOOL_VAL;
@@ -825,7 +875,9 @@ int dpi_yaml_set_bool(int h, const char* key, int value) {
 
 int dpi_yaml_set_null(int h, const char* key) {
     const YamlNode* n = get_node(h);
-    if (!n || n->type != YamlNode::MAP_VAL || !key) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (n->type != YamlNode::MAP_VAL) { SET_ERROR("expected object for set_null('%s')", key ? key : "(null)"); return 0; }
+    if (!key) { SET_ERROR("null key"); return 0; }
     YamlNode new_node = *n;
     YamlNode val_node;
     val_node.type = YamlNode::NULL_VAL;
@@ -846,18 +898,20 @@ int dpi_yaml_set_null(int h, const char* key) {
 
 const char* dpi_yaml_dump(int h, int indent) {
     const YamlNode* n = get_node(h);
-    if (!n) return "";
+    if (!n) { SET_ERROR("invalid handle: %d", h); return ""; }
     return return_str(emit_yaml_int(h, indent, false));
 }
 
 int dpi_yaml_dump_file(int h, const char* fname, int indent) {
     const YamlNode* n = get_node(h);
-    if (!n || !fname) return -1;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return -1; }
+    if (!fname) { SET_ERROR("null filename"); return -1; }
     std::string yaml = emit_yaml_int(h, indent, false);
     std::ofstream f(fname);
-    if (!f.is_open()) return -1;
+    if (!f.is_open()) { SET_ERROR("cannot open file: '%s'", fname); return -1; }
     f << yaml;
-    return f.good() ? 0 : -1;
+    if (!f.good()) { SET_ERROR("write failed for file: '%s'", fname); return -1; }
+    return 0;
 }
 
 int dpi_yaml_write_file(int h, const char* path, int indent) {
@@ -867,7 +921,7 @@ int dpi_yaml_write_file(int h, const char* path, int indent) {
 // --- YAML-specific: multi-document ---
 
 int dpi_yaml_parse_all(const char* input) {
-    if (!input) return 0;
+    if (!input) { SET_ERROR("null input"); return 0; }
     std::string content(input);
 
     auto parse_as_docs = [](const std::string& s) -> int {
@@ -888,7 +942,13 @@ int dpi_yaml_parse_all(const char* input) {
                 }
             }
             return alloc_handle(root);
-        } catch (...) { return 0; }
+        } catch (const std::exception& e) {
+            SET_ERROR("YAML parse_all error: %s", e.what());
+            return 0;
+        } catch (...) {
+            SET_ERROR("YAML parse_all error: unknown exception");
+            return 0;
+        }
     };
 
     // Try as YAML content first
@@ -903,6 +963,7 @@ int dpi_yaml_parse_all(const char* input) {
         result = parse_as_docs(content);
         if (result > 0) return result;
     }
+    SET_ERROR("failed to parse input as YAML multi-document");
     return 0;
 }
 
@@ -910,13 +971,13 @@ int dpi_yaml_parse_all(const char* input) {
 
 const char* dpi_yaml_comments(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return "";
+    if (!n) { SET_ERROR("invalid handle: %d", h); return ""; }
     return return_str(n->comment);
 }
 
 int dpi_yaml_set_comment(int h, const char* text) {
     const YamlNode* n = get_node(h);
-    if (!n) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
     YamlNode new_node = *n;
     new_node.comment = text ? text : "";
     return alloc_handle(new_node);
@@ -926,13 +987,14 @@ int dpi_yaml_set_comment(int h, const char* text) {
 
 const char* dpi_yaml_anchor(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return "";
+    if (!n) { SET_ERROR("invalid handle: %d", h); return ""; }
     return return_str(n->anchor);
 }
 
 int dpi_yaml_set_anchor(int h, const char* name) {
     const YamlNode* n = get_node(h);
-    if (!n || !name) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (!name) { SET_ERROR("null anchor name"); return 0; }
     YamlNode new_node = *n;
     new_node.anchor = name;
     return alloc_handle(new_node);
@@ -940,7 +1002,7 @@ int dpi_yaml_set_anchor(int h, const char* name) {
 
 const char* dpi_yaml_alias(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return "";
+    if (!n) { SET_ERROR("invalid handle: %d", h); return ""; }
     return return_str(n->alias_name);
 }
 
@@ -948,13 +1010,14 @@ const char* dpi_yaml_alias(int h) {
 
 const char* dpi_yaml_tag(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return "";
+    if (!n) { SET_ERROR("invalid handle: %d", h); return ""; }
     return return_str(n->tag);
 }
 
 int dpi_yaml_set_tag(int h, const char* tag) {
     const YamlNode* n = get_node(h);
-    if (!n || !tag) return 0;
+    if (!n) { SET_ERROR("invalid handle: %d", h); return 0; }
+    if (!tag) { SET_ERROR("null tag"); return 0; }
     YamlNode new_node = *n;
     new_node.tag = tag;
     return alloc_handle(new_node);
@@ -964,13 +1027,13 @@ int dpi_yaml_set_tag(int h, const char* tag) {
 
 const char* dpi_yaml_dump_flow(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return "";
+    if (!n) { SET_ERROR("invalid handle: %d", h); return ""; }
     return return_str(emit_yaml_int(h, 0, true));
 }
 
 const char* dpi_yaml_dump_with_comments(int h) {
     const YamlNode* n = get_node(h);
-    if (!n) return "";
+    if (!n) { SET_ERROR("invalid handle: %d", h); return ""; }
     std::string result = emit_yaml_int(h, 0, false);
     if (!n->comment.empty()) {
         result = "# " + n->comment + "\n" + result;
