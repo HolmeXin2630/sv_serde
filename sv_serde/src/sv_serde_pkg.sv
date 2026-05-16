@@ -40,9 +40,5 @@ package sv_serde_pkg;
   localparam SV_YAML_ARRAY   = SERDE_ARRAY;
   localparam SV_YAML_OBJECT  = SERDE_OBJECT;
 
-  import sv_json_pkg::*;
-  import sv_yaml_pkg::*;
-  export sv_json_pkg::*;
-  export sv_yaml_pkg::*;
 
 endpackage
