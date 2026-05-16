@@ -28,4 +28,31 @@
 #define SV_YAML_TYPE_ARRAY   SERDE_TYPE_ARRAY
 #define SV_YAML_TYPE_OBJECT  SERDE_TYPE_OBJECT
 
+// Error reporting — thread-safe last-error buffer
+#ifdef __cplusplus
+extern "C" {
+#endif
+const char* dpi_serde_last_error(void);
+#ifdef __cplusplus
+}
+#endif
+
+// Helper macro and namespace for DPI backends to set error messages
+#ifdef __cplusplus
+#include <cstdio>
+#include <string>
+namespace serde {
+inline void set_error(const std::string& msg) {
+    // defined in each backend's .cc file
+    extern thread_local std::string g_last_error;
+    g_last_error = msg;
+}
+}
+#define SET_ERROR(fmt, ...) do { \
+    char _buf[512]; \
+    std::snprintf(_buf, sizeof(_buf), fmt, ##__VA_ARGS__); \
+    serde::set_error(std::string(_buf)); \
+} while(0)
+#endif
+
 #endif // SERDE_COMMON_H
