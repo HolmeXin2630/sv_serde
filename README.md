@@ -100,38 +100,33 @@ import sv_serde_pkg::*;       // Both JSON and YAML
 
 ### VCS
 
-```bash
-# JSON only
-vcs -full64 -sverilog \
-    sv_json/src/sv_json_pkg.sv your_test.sv \
-    sv_json/src/dpi/sv_json_dpi.cc \
-    -o simv
-
-# JSON + YAML
-vcs -full64 -sverilog \
-    sv_json/src/sv_json_pkg.sv \
-    sv_yaml/src/sv_yaml_pkg.sv \
-    your_test.sv \
-    sv_json/src/dpi/sv_json_dpi.cc \
-    sv_yaml/src/dpi/sv_yaml_dpi.cc \
-    -o simv
-```
-
-**Using pre-built shared libraries (faster, no C++ compilation):**
+**Simple (using pre-built shared libraries):**
 
 ```bash
 # JSON only
 vcs -full64 -sverilog \
-    sv_json/src/sv_json_pkg.sv your_test.sv \
+    +incdir+sv_serde/src +incdir+sv_json/src \
+    sv_serde/src/sv_serde_all.sv your_test.sv \
     -LDFLAGS "sv_json/src/dpi/libsv_json.so -Wl,-rpath,sv_json/src/dpi" \
     -o simv
 
 # JSON + YAML
 vcs -full64 -sverilog \
-    sv_json/src/sv_json_pkg.sv \
-    sv_yaml/src/sv_yaml_pkg.sv \
-    your_test.sv \
+    +incdir+sv_serde/src +incdir+sv_json/src +incdir+sv_yaml/src \
+    sv_serde/src/sv_serde_all.sv your_test.sv \
     -LDFLAGS "sv_json/src/dpi/libsv_json.so sv_yaml/src/dpi/libsv_yaml.so -Wl,-rpath,sv_json/src/dpi:sv_yaml/src/dpi" \
+    -o simv
+```
+
+**With C++ compilation (for custom builds):**
+
+```bash
+# JSON only
+vcs -full64 -sverilog \
+    +incdir+sv_serde/src +incdir+sv_json/src \
+    sv_serde/src/sv_serde_all.sv your_test.sv \
+    sv_json/src/dpi/sv_json_dpi.cc sv_serde/src/dpi/serde_common.cc \
+    -CFLAGS "-std=c++14 -Isv_json/src/dpi -Isv_serde/src/dpi" \
     -o simv
 ```
 

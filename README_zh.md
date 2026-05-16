@@ -100,38 +100,33 @@ import sv_serde_pkg::*;       // 同时包含 JSON 和 YAML
 
 ### VCS
 
-```bash
-# 仅 JSON
-vcs -full64 -sverilog \
-    sv_json/src/sv_json_pkg.sv your_test.sv \
-    sv_json/src/dpi/sv_json_dpi.cc \
-    -o simv
-
-# JSON + YAML
-vcs -full64 -sverilog \
-    sv_json/src/sv_json_pkg.sv \
-    sv_yaml/src/sv_yaml_pkg.sv \
-    your_test.sv \
-    sv_json/src/dpi/sv_json_dpi.cc \
-    sv_yaml/src/dpi/sv_yaml_dpi.cc \
-    -o simv
-```
-
-**使用预编译共享库（更快，无需编译 C++）：**
+**简洁方式（使用预编译共享库）：**
 
 ```bash
 # 仅 JSON
 vcs -full64 -sverilog \
-    sv_json/src/sv_json_pkg.sv your_test.sv \
+    +incdir+sv_serde/src +incdir+sv_json/src \
+    sv_serde/src/sv_serde_all.sv your_test.sv \
     -LDFLAGS "sv_json/src/dpi/libsv_json.so -Wl,-rpath,sv_json/src/dpi" \
     -o simv
 
 # JSON + YAML
 vcs -full64 -sverilog \
-    sv_json/src/sv_json_pkg.sv \
-    sv_yaml/src/sv_yaml_pkg.sv \
-    your_test.sv \
+    +incdir+sv_serde/src +incdir+sv_json/src +incdir+sv_yaml/src \
+    sv_serde/src/sv_serde_all.sv your_test.sv \
     -LDFLAGS "sv_json/src/dpi/libsv_json.so sv_yaml/src/dpi/libsv_yaml.so -Wl,-rpath,sv_json/src/dpi:sv_yaml/src/dpi" \
+    -o simv
+```
+
+**C++ 编译方式（自定义构建）：**
+
+```bash
+# 仅 JSON
+vcs -full64 -sverilog \
+    +incdir+sv_serde/src +incdir+sv_json/src \
+    sv_serde/src/sv_serde_all.sv your_test.sv \
+    sv_json/src/dpi/sv_json_dpi.cc sv_serde/src/dpi/serde_common.cc \
+    -CFLAGS "-std=c++14 -Isv_json/src/dpi -Isv_serde/src/dpi" \
     -o simv
 ```
 
