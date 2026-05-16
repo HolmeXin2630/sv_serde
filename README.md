@@ -128,12 +128,12 @@ xrun -sv \
 ### Verilator (testing only)
 
 ```bash
-make -f run/Makefile.verilator run_test_json   # JSON tests (97 tests)
-make -f run/Makefile.verilator run_test_yaml   # YAML tests (124 tests)
-make -f run/Makefile.verilator run_test_all    # All tests (221 tests)
+make -f run/Makefile.verilator run_test_json   # JSON SV API tests (51 tests)
+make -f run/Makefile.verilator run_test_yaml   # YAML SV API tests (62 tests)
+make -f run/Makefile.verilator run_test_all    # All SV API tests (113 tests)
 ```
 
-> **Note:** Verilator 5.x does not support SystemVerilog classes. The test suite calls DPI functions directly. The `sv_json`/`sv_yaml` classes work with VCS and Xcelium.
+> **Note:** The Verilator test flow now exercises the public SystemVerilog API directly by importing packages and calling `sv_json`/`sv_yaml` methods.
 
 ## API Reference
 

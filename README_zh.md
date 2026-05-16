@@ -128,12 +128,12 @@ xrun -sv \
 ### Verilator（仅用于测试）
 
 ```bash
-make -f run/Makefile.verilator run_test_json   # JSON 测试（97 个）
-make -f run/Makefile.verilator run_test_yaml   # YAML 测试（124 个）
-make -f run/Makefile.verilator run_test_all    # 全部测试（221 个）
+make -f run/Makefile.verilator run_test_json   # JSON 的 SV API 测试（51 个）
+make -f run/Makefile.verilator run_test_yaml   # YAML 的 SV API 测试（62 个）
+make -f run/Makefile.verilator run_test_all    # 全部 SV API 测试（113 个）
 ```
 
-> **注意：** Verilator 5.x 不支持 SystemVerilog 类。测试套件直接调用 DPI 函数。`sv_json`/`sv_yaml` 类需配合 VCS 和 Xcelium 使用。
+> **注意：** 当前 Verilator 测试流程会直接导入 package，并调用 `sv_json`/`sv_yaml` 的公开 SystemVerilog API。
 
 ## API 参考
 

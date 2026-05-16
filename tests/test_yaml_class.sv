@@ -1,4 +1,4 @@
-module vcs_yaml_test;
+module test_yaml_class;
   import sv_yaml_pkg::*;
 
   int pass_count = 0;
@@ -36,9 +36,11 @@ module vcs_yaml_test;
 
   initial begin
     sv_yaml y, y2, arr;
+    sv_yaml cloned, tagged_value, anchored;
     string s;
+    string keys[$];
 
-    $display("=== VCS sv_yaml class tests ===");
+    $display("=== sv_yaml class tests ===");
 
     // parse
     y = sv_yaml::parse("name: Alice\nage: 30");
@@ -113,7 +115,6 @@ module vcs_yaml_test;
     // key_at / get_keys
     y = sv_yaml::parse("a: 1\nb: 2");
     check_string("key_at(0)", y.key_at(0), "a");
-    string keys[$];
     y.get_keys(keys);
     check_int("get_keys size", keys.size(), 2);
 
@@ -151,7 +152,6 @@ module vcs_yaml_test;
     // clone
     y = sv_yaml::parse("a: 1");
     begin
-      sv_yaml cloned;
       cloned = y.clone();
       check_bit("clone is_valid", cloned.is_valid(), 1);
       check_int("clone value", cloned.get("a").as_int(), 1);
@@ -165,14 +165,12 @@ module vcs_yaml_test;
     // YAML-specific: yaml_tag, yaml_anchor, yaml_dump_flow
     y = sv_yaml::parse("42");
     begin
-      sv_yaml tagged;
-      tagged = y.yaml_set_tag("!!int");
-      check_string("yaml_tag", tagged.yaml_tag(), "!!int");
+      tagged_value = y.yaml_set_tag("!!int");
+      check_string("yaml_tag", tagged_value.yaml_tag(), "!!int");
     end
 
     y = sv_yaml::parse("\"hello\"");
     begin
-      sv_yaml anchored;
       anchored = y.yaml_set_anchor("my_anchor");
       check_string("yaml_anchor", anchored.yaml_anchor(), "my_anchor");
     end
