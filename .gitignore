@@ -2,8 +2,8 @@
 obj_dir_*/
 
 # VCS
-simv
-simv.daidir/
+simv*
+*.daidir/
 csrc/
 ucli.key
 vc_hdrs.h
@@ -13,6 +13,8 @@ inter.vpd
 dumpvars.vcd
 *.vpd
 *.fsdb
+vcs_*.log
+elabMhIdDidWork.txt*
 
 # Xcelium
 xcelium.d/
