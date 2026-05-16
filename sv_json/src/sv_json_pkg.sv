@@ -80,8 +80,12 @@ package sv_json_pkg;
 
   class sv_json extends sv_serde_base;
 
-    function new(int handle, sv_serde_type_e json_type);
+    function new(int handle = 0, sv_serde_type_e json_type = SERDE_NULL);
       super.new(handle, json_type);
+    endfunction
+
+    local function sv_json build(int h, sv_serde_type_e t);
+      return new(h, t);
     endfunction
 
     // --- DPI dispatch virtual overrides (one-liner delegates) ---
@@ -195,35 +199,43 @@ package sv_json_pkg;
     static function sv_json parse(string input_str);
       int h = dpi_json_parse(input_str);
       if (h == 0) return null;
-      return new(h, sv_serde_type_e'(dpi_json_get_type(h)));
+      sv_json seed = new();
+      return seed.build(h, sv_serde_type_e'(dpi_json_get_type(h)));
     endfunction
 
     static function sv_json new_object();
-      return new(dpi_json_new_object(), SERDE_OBJECT);
+      sv_json seed = new();
+      return seed.build(dpi_json_new_object(), SERDE_OBJECT);
     endfunction
 
     static function sv_json new_array();
-      return new(dpi_json_new_array(), SERDE_ARRAY);
+      sv_json seed = new();
+      return seed.build(dpi_json_new_array(), SERDE_ARRAY);
     endfunction
 
     static function sv_json from_string(string val);
-      return new(dpi_json_create_string(val), SERDE_STRING);
+      sv_json seed = new();
+      return seed.build(dpi_json_create_string(val), SERDE_STRING);
     endfunction
 
     static function sv_json from_int(int val);
-      return new(dpi_json_create_int_val(val), SERDE_INT);
+      sv_json seed = new();
+      return seed.build(dpi_json_create_int_val(val), SERDE_INT);
     endfunction
 
     static function sv_json from_real(real val);
-      return new(dpi_json_create_float_val(val), SERDE_REAL);
+      sv_json seed = new();
+      return seed.build(dpi_json_create_float_val(val), SERDE_REAL);
     endfunction
 
     static function sv_json from_bool(bit val);
-      return new(dpi_json_create_bool_val(val ? 1 : 0), SERDE_BOOL);
+      sv_json seed = new();
+      return seed.build(dpi_json_create_bool_val(val ? 1 : 0), SERDE_BOOL);
     endfunction
 
     static function sv_json make_null();
-      return new(dpi_json_create_null(), SERDE_NULL);
+      sv_json seed = new();
+      return seed.build(dpi_json_create_null(), SERDE_NULL);
     endfunction
 
   endclass

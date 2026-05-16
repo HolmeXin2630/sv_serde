@@ -92,8 +92,12 @@ package sv_yaml_pkg;
 
   class sv_yaml extends sv_serde_base;
 
-    function new(int handle, sv_serde_type_e yaml_type);
+    function new(int handle = 0, sv_serde_type_e yaml_type = SERDE_NULL);
       super.new(handle, yaml_type);
+    endfunction
+
+    local function sv_yaml build(int h, sv_serde_type_e t);
+      return new(h, t);
     endfunction
 
     // --- DPI dispatch virtual overrides (one-liner delegates) ---
@@ -207,42 +211,51 @@ package sv_yaml_pkg;
     static function sv_yaml parse(string input_str);
       int h = dpi_yaml_parse(input_str);
       if (h == 0) return null;
-      return new(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      sv_yaml seed = new();
+      return seed.build(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
     endfunction
 
     static function sv_yaml new_object();
-      return new(dpi_yaml_new_object(), SERDE_OBJECT);
+      sv_yaml seed = new();
+      return seed.build(dpi_yaml_new_object(), SERDE_OBJECT);
     endfunction
 
     static function sv_yaml new_array();
-      return new(dpi_yaml_new_array(), SERDE_ARRAY);
+      sv_yaml seed = new();
+      return seed.build(dpi_yaml_new_array(), SERDE_ARRAY);
     endfunction
 
     static function sv_yaml from_string(string val);
-      return new(dpi_yaml_create_string(val), SERDE_STRING);
+      sv_yaml seed = new();
+      return seed.build(dpi_yaml_create_string(val), SERDE_STRING);
     endfunction
 
     static function sv_yaml from_int(int val);
-      return new(dpi_yaml_create_int_val(val), SERDE_INT);
+      sv_yaml seed = new();
+      return seed.build(dpi_yaml_create_int_val(val), SERDE_INT);
     endfunction
 
     static function sv_yaml from_real(real val);
-      return new(dpi_yaml_create_float_val(val), SERDE_REAL);
+      sv_yaml seed = new();
+      return seed.build(dpi_yaml_create_float_val(val), SERDE_REAL);
     endfunction
 
     static function sv_yaml from_bool(bit val);
-      return new(dpi_yaml_create_bool_val(val ? 1 : 0), SERDE_BOOL);
+      sv_yaml seed = new();
+      return seed.build(dpi_yaml_create_bool_val(val ? 1 : 0), SERDE_BOOL);
     endfunction
 
     static function sv_yaml make_null();
-      return new(dpi_yaml_create_null(), SERDE_NULL);
+      sv_yaml seed = new();
+      return seed.build(dpi_yaml_create_null(), SERDE_NULL);
     endfunction
 
     // --- YAML-specific methods ---
     static function sv_yaml yaml_parse_all(string input_str);
       int h = dpi_yaml_parse_all(input_str);
       if (h == 0) return null;
-      return new(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
+      sv_yaml seed = new();
+      return seed.build(h, sv_serde_type_e'(dpi_yaml_get_type(h)));
     endfunction
 
     function string yaml_comments();
