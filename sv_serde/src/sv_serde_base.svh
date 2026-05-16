@@ -19,9 +19,9 @@ virtual class sv_serde_base;
   // -----------------------------------------------------------------------
   // Constructor
   // -----------------------------------------------------------------------
-  protected function new(int handle, sv_serde_type_e type);
+  protected function new(int handle, sv_serde_type_e serde_type);
     m_handle = handle;
-    m_type = type;
+    m_type = serde_type;
     m_strict_mode = s_default_strict_mode;
   endfunction
 
@@ -174,9 +174,10 @@ virtual class sv_serde_base;
   endfunction
 
   function void get_keys(output string keys[$]);
+    int n;
     keys = {};
     if (!is_object()) return;
-    int n = size();
+    n = size();
     for (int i = 0; i < n; i++)
       keys.push_back(key_at(i));
   endfunction
