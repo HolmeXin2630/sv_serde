@@ -168,25 +168,29 @@ package sv_json_pkg;
 
     function string value_string(string key, string default_val);
       sv_json v = get(key);
-      if (v == null || !v.is_string()) return default_val;
+      if (v == null) return default_val;
+      if (!v.is_string()) return default_val;
       return v.as_string();
     endfunction
 
     function int value_int(string key, int default_val);
       sv_json v = get(key);
-      if (v == null || !v.is_int()) return default_val;
+      if (v == null) return default_val;
+      if (!v.is_int()) return default_val;
       return v.as_int();
     endfunction
 
     function real value_real(string key, real default_val);
       sv_json v = get(key);
-      if (v == null || !v.is_real()) return default_val;
+      if (v == null) return default_val;
+      if (!v.is_real()) return default_val;
       return v.as_real();
     endfunction
 
     function bit value_bool(string key, bit default_val);
       sv_json v = get(key);
-      if (v == null || !v.is_boolean()) return default_val;
+      if (v == null) return default_val;
+      if (!v.is_boolean()) return default_val;
       return v.as_bool();
     endfunction
 
@@ -305,6 +309,20 @@ package sv_json_pkg;
     // Alias for dump with file
     function int dump_file(string fname, int indent = 2);
       return dpi_json_dump_file(m_handle, fname, indent);
+    endfunction
+
+    // --- Lifecycle ---
+
+    function sv_json clone();
+      int h = dpi_json_clone(m_handle);
+      sv_json tmp;
+      if (h == 0) return null;
+      tmp = new(h, sv_json_type_e'(dpi_json_get_type(h)));
+      return tmp;
+    endfunction
+
+    function bit is_valid();
+      return dpi_json_is_valid(m_handle);
     endfunction
 
   endclass

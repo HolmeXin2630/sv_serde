@@ -171,25 +171,29 @@ package sv_yaml_pkg;
 
     function string value_string(string key, string default_val);
       sv_yaml v = get(key);
-      if (v == null || !v.is_string()) return default_val;
+      if (v == null) return default_val;
+      if (!v.is_string()) return default_val;
       return v.as_string();
     endfunction
 
     function int value_int(string key, int default_val);
       sv_yaml v = get(key);
-      if (v == null || !v.is_int()) return default_val;
+      if (v == null) return default_val;
+      if (!v.is_int()) return default_val;
       return v.as_int();
     endfunction
 
     function real value_real(string key, real default_val);
       sv_yaml v = get(key);
-      if (v == null || !v.is_real()) return default_val;
+      if (v == null) return default_val;
+      if (!v.is_real()) return default_val;
       return v.as_real();
     endfunction
 
     function bit value_bool(string key, bit default_val);
       sv_yaml v = get(key);
-      if (v == null || !v.is_boolean()) return default_val;
+      if (v == null) return default_val;
+      if (!v.is_boolean()) return default_val;
       return v.as_bool();
     endfunction
 
@@ -331,6 +335,20 @@ package sv_yaml_pkg;
 
     function string yaml_dump_flow(); return dpi_yaml_dump_flow(m_handle); endfunction
     function string yaml_dump_with_comments(); return dpi_yaml_dump_with_comments(m_handle); endfunction
+
+    // --- Lifecycle ---
+
+    function sv_yaml clone();
+      int h = dpi_yaml_clone(m_handle);
+      sv_yaml tmp;
+      if (h == 0) return null;
+      tmp = new(h, sv_yaml_type_e'(dpi_yaml_get_type(h)));
+      return tmp;
+    endfunction
+
+    function bit is_valid();
+      return dpi_yaml_is_valid(m_handle);
+    endfunction
 
   endclass
 

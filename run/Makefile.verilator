@@ -1,5 +1,5 @@
 VERILATOR ?= verilator
-VERILATOR_FLAGS = --cc --exe --build -Wall -Wno-DECLFILENAME -I$(abspath tests)
+VERILATOR_FLAGS = --cc --exe --build -Wno-WIDTH -Wno-CASEINCOMPLETE -Wno-UNOPTFLAT -Wno-UNUSED -Wno-BLKANDNBLK -Wno-STMTDLY -Wno-INITIALDLY -Wno-IMPLICIT -Wno-DECLFILENAME -Wno-WIDTHTRUNC -I$(abspath tests)
 
 JSON_CFLAGS = -std=c++14 -I$(abspath sv_json/src/dpi) -I$(abspath sv_serde/src/dpi)
 YAML_CFLAGS = -std=c++14 -I$(abspath sv_yaml/src/dpi) -I$(abspath sv_serde/src/dpi)
@@ -17,7 +17,7 @@ YAML_TEST_CPP = sv_yaml/tests/main_yaml.cpp
 YAML_TOP = sv_yaml_test
 YAML_OBJ_DIR = obj_dir_yaml
 
-.PHONY: run_test_json run_test_yaml run_test_all clean
+.PHONY: run_test_json run_test_yaml run_test_class run_test_all clean
 
 run_test_json:
 	$(VERILATOR) $(VERILATOR_FLAGS) -CFLAGS "$(JSON_CFLAGS)" \
@@ -39,7 +39,18 @@ run_test_yaml:
 		-o test_yaml
 	./$(YAML_OBJ_DIR)/test_yaml
 
-run_test_all: run_test_json run_test_yaml
+run_test_class:
+	$(VERILATOR) $(VERILATOR_FLAGS) -CFLAGS "$(JSON_CFLAGS)" \
+		sv_json/src/sv_json_pkg.sv \
+		tests/test_json_class.sv \
+		tests/main_json_class.cpp \
+		$(DPI_SRC) \
+		--top-module test_json_class \
+		--Mdir obj_dir_class_test \
+		-o test_json_class
+	./obj_dir_class_test/test_json_class
+
+run_test_all: run_test_json run_test_yaml run_test_class
 	@echo "All tests passed!"
 
 clean:
