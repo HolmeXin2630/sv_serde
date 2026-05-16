@@ -8,4 +8,6 @@
 package sv_serde_pkg;
   import sv_json_pkg::*;
   import sv_yaml_pkg::*;
+  export sv_json_pkg::*;
+  export sv_yaml_pkg::*;
 endpackage
